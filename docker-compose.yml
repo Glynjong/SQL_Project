@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: sql-debugger-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1
+      POSTGRES_DB: SQL_Database
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sql-debugger-network
+
+  # Backend Server
+  backend:
+    build: ./Backend
+    container_name: sql-debugger-backend
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: production
+      DB_USER: postgres
+      DB_PASSWORD: 1
+      DB_HOST: host.docker.internal
+      DB_PORT: 5432
+      DB_NAME: SQL_Database
+    networks:
+      - sql-debugger-network
+    restart: unless-stopped
+
+  # Frontend Server
+  frontend:
+    build: ./Frontend
+    container_name: sql-debugger-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - sql-debugger-network
+    restart: unless-stopped
+
+  # pgAdmin4 - PostgreSQL Management Tool
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: sql-debugger-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    networks:
+      - sql-debugger-network
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+
+networks:
+  sql-debugger-network:
+    driver: bridge

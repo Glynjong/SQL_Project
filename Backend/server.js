@@ -6,13 +6,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Connect to your local Postgres
+// Connect to Postgres (via environment variables for Docker support)
 const pool = new Pool({
-  user: 'postgres',           // Your postgres username
-  host: 'localhost',
-  database: 'SQL_Database',       // Your database name
-  password: '1',   // Your password
-  port: 5432,
+  user: process.env.DB_USER || 'postgres',
+  host: process.env.DB_HOST || 'localhost',
+  database: process.env.DB_NAME || 'SQL_Database',
+  password: process.env.DB_PASSWORD || '1',
+  port: process.env.DB_PORT || 5432,
 });
 
 app.post('/run-query', async (req, res) => {
@@ -27,6 +27,17 @@ app.post('/run-query', async (req, res) => {
       command: result.command,
       rowCount: result.rowCount 
     });
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/explain-query', async (req, res) => {
+  const { sql } = req.body;
+  try {
+    const result = await pool.query(`EXPLAIN (FORMAT JSON) ${sql}`);
+    res.json({ success: true, plan: result.rows[0]['QUERY PLAN'][0] });
   } catch (err) {
     console.error(err);
     res.status(400).json({ success: false, error: err.message });
