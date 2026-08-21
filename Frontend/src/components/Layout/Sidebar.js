@@ -1,5 +1,5 @@
 import React from 'react';
-import '../../../App.css';
+import '../../App.css';
 
 export const Sidebar = ({ tables, activeTab, onTableClick }) => {
   const getSidebarIcon = () => {
@@ -15,6 +15,11 @@ export const Sidebar = ({ tables, activeTab, onTableClick }) => {
     }
   };
 
+  const handleClick = (table) => {
+    console.log('Sidebar item clicked:', table);
+    onTableClick(table);
+  };
+
   return (
     <div className="sidebar">
       <div className="sidebar-header">Tables</div>
@@ -23,7 +28,7 @@ export const Sidebar = ({ tables, activeTab, onTableClick }) => {
           <div
             key={table}
             className="sidebar-item"
-            onClick={() => onTableClick(table)}
+            onClick={() => handleClick(table)}
           >
             <span className="sidebar-item-icon">{getSidebarIcon()}</span>
             {table}

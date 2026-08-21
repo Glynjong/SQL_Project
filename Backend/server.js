@@ -17,8 +17,10 @@ const pool = new Pool({
 
 app.post('/run-query', async (req, res) => {
   const { sql } = req.body;
+  console.log('Executing query:', sql);
   try {
     const result = await pool.query(sql);
+    console.log('Query result:', { rows: result.rows.length, command: result.command, rowCount: result.rowCount });
     
     // Check if this was a SELECT (has rows) or a CREATE/INSERT (has rowCount/command)
     res.json({ 
@@ -28,7 +30,7 @@ app.post('/run-query', async (req, res) => {
       rowCount: result.rowCount 
     });
   } catch (err) {
-    console.error(err);
+    console.error('Query error:', err.message);
     res.status(400).json({ success: false, error: err.message });
   }
 });
@@ -37,6 +39,17 @@ app.post('/explain-query', async (req, res) => {
   const { sql } = req.body;
   try {
     const result = await pool.query(`EXPLAIN (FORMAT JSON) ${sql}`);
+    res.json({ success: true, plan: result.rows[0]['QUERY PLAN'][0] });
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/explain-analyze-query', async (req, res) => {
+  const { sql } = req.body;
+  try {
+    const result = await pool.query(`EXPLAIN (ANALYZE, BUFFERS, TIMING, VERBOSE, FORMAT JSON) ${sql}`);
     res.json({ success: true, plan: result.rows[0]['QUERY PLAN'][0] });
   } catch (err) {
     console.error(err);

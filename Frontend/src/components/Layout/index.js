@@ -1,7 +1,7 @@
 import React from 'react';
 import { TopBar } from './TopBar';
 import { Sidebar } from './Sidebar';
-import '../../../App.css';
+import '../../App.css';
 
 export const AppLayout = ({
   children,

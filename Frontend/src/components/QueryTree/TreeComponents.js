@@ -1,5 +1,5 @@
 import React from 'react';
-import '../../../App.css';
+import '../../App.css';
 
 export const TreeLegend = () => (
   <div className="tree-legend">
@@ -19,7 +19,7 @@ export const TreeLegend = () => (
   </div>
 );
 
-export const TreeToolbar = ({ query, onQueryChange, onExplain, isLoading }) => (
+export const TreeToolbar = ({ query, onQueryChange, onExplain, onAnalyze, isLoading }) => (
   <div className="tree-toolbar">
     <textarea
       className="tree-query-editor"
@@ -27,8 +27,13 @@ export const TreeToolbar = ({ query, onQueryChange, onExplain, isLoading }) => (
       value={query}
       onChange={(e) => onQueryChange(e.target.value)}
     />
-    <button className="btn-success" onClick={onExplain} disabled={isLoading}>
-      {isLoading ? 'Analyzing…' : '🌳 Explain'}
-    </button>
+    <div style={{ display: 'flex', gap: '8px' }}>
+      <button className="btn-success" onClick={onExplain} disabled={isLoading}>
+        {isLoading ? 'Analyzing…' : '🌳 Explain'}
+      </button>
+      <button className="btn-success" onClick={onAnalyze} disabled={isLoading} style={{ background: 'var(--orange)' }}>
+        {isLoading ? 'Analyzing…' : '⚙️ Analyze'}
+      </button>
+    </div>
   </div>
 );

@@ -1,5 +1,5 @@
-# Build stage for React frontend
-FROM node:18-alpine AS builder
+# Development and Production Dockerfile for React frontend
+FROM node:18-alpine
 
 WORKDIR /app
 
@@ -16,24 +16,10 @@ COPY src ./src
 # Set CI environment variable to treat warnings as warnings, not errors
 ENV CI=false
 
-# Build the application
-RUN npm run build
+# Expose port 3000 for development (npm start)
+EXPOSE 3000
 
-# Production stage - serve with Nginx
-FROM nginx:alpine
-
-# Copy built files to Nginx
-COPY --from=builder /app/build /usr/share/nginx/html
-
-# Copy Nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Expose port 80
-EXPOSE 80
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost/ || exit 1
-
-# Start Nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Development will use: npm start
+# Production will use: npm run build && npx serve -s build
+# Default to start (development)
+CMD ["npm", "start"]

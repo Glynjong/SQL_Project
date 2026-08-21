@@ -1,5 +1,5 @@
 import React from 'react';
-import '../../../App.css';
+import '../../App.css';
 
 export const ResultsTable = ({ rows }) => {
   if (!rows || rows.length === 0)

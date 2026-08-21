@@ -1,5 +1,5 @@
 import React from 'react';
-import '../../../App.css';
+import '../../App.css';
 
 export const EmptyState = ({ icon = '📭', title = 'No results', subtitle = '' }) => (
   <div className="results-empty">

@@ -74,6 +74,54 @@ export const useSchemaVisualizer = () => {
     setEdges([]);
   };
 
+  const addAllTablesToCanvas = async () => {
+    if (Object.keys(schemaData).length === 0) return;
+
+    const newNodes = [];
+    const tableNames = Object.keys(schemaData);
+    
+    // Create grid layout for tables
+    const itemsPerRow = Math.ceil(Math.sqrt(tableNames.length));
+    const nodeWidth = 250;
+    const nodeHeight = 200;
+    const spacing = 50;
+
+    tableNames.forEach((tableName, index) => {
+      if (nodeTableExists(newNodes, tableName)) return;
+
+      const row = Math.floor(index / itemsPerRow);
+      const col = index % itemsPerRow;
+      const cols = schemaData[tableName];
+      
+      const node = createDatabaseNode(tableName, cols);
+      node.position = {
+        x: col * (nodeWidth + spacing),
+        y: row * (nodeHeight + spacing),
+      };
+      newNodes.push(node);
+    });
+
+    setNodes(newNodes);
+
+    // Add foreign key edges after all tables are added
+    setTimeout(async () => {
+      try {
+        const fkRows = await fetchForeignKeys();
+        const canvasTableNames = new Set(newNodes.map((n) => n.id));
+        const newEdges = createForeignKeyEdges(fkRows, canvasTableNames);
+
+        if (newEdges.length > 0) {
+          setEdges((eds) => {
+            const existingIds = new Set(eds.map((e) => e.id));
+            return [...eds, ...newEdges.filter((e) => !existingIds.has(e.id))];
+          });
+        }
+      } catch (err) {
+        console.error('Failed to add FK edges:', err);
+      }
+    }, 100);
+  };
+
   return {
     nodes,
     setNodes,
@@ -86,6 +134,7 @@ export const useSchemaVisualizer = () => {
     isLoading,
     loadSchemaMetadata,
     addTableToCanvas,
+    addAllTablesToCanvas,
     clearCanvas,
   };
 };

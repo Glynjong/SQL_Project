@@ -27,28 +27,40 @@ services:
     container_name: sql-debugger-backend
     ports:
       - "5000:5000"
+    volumes:
+      - ./Backend:/app
+      - /app/node_modules
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       DB_USER: postgres
       DB_PASSWORD: 1
       DB_HOST: host.docker.internal
       DB_PORT: 5432
       DB_NAME: SQL_Database
+    command: npm run dev
     networks:
       - sql-debugger-network
-    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   # Frontend Server
   frontend:
     build: ./Frontend
     container_name: sql-debugger-frontend
     ports:
-      - "80:80"
+      - "3000:3000"
+    volumes:
+      - ./Frontend/src:/app/src
+      - ./Frontend/public:/app/public
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000
+      - CI=false
+    command: npm start
     depends_on:
       - backend
     networks:
       - sql-debugger-network
-    restart: unless-stopped
 
   # pgAdmin4 - PostgreSQL Management Tool
   pgadmin:

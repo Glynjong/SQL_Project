@@ -1,7 +1,7 @@
 import React from 'react';
 import { ResultsTable } from '../Common/ResultsTable';
 import { EmptyState } from '../Common/EmptyState';
-import '../../../App.css';
+import '../../App.css';
 
 export const QueryEditor = ({ query, onChange, onExecute, isLoading }) => (
   <div className="query-editor-wrap">

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ResultsTable } from '../Common/ResultsTable';
 import { costColor } from '../../utils/planUtils';
-import '../../../App.css';
+import '../../App.css';
 
 export const StagePanel = ({ stage, onClose, onNodeClick }) => {
   if (!stage) return null;

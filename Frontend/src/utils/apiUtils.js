@@ -22,6 +22,15 @@ export const explainQuery = async (sql) => {
   return response.json();
 };
 
+export const explainAnalyzeQuery = async (sql) => {
+  const response = await fetch(getApiUrl('/explain-analyze-query'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sql }),
+  });
+  return response.json();
+};
+
 export const fetchSchemaMetadata = async () => {
   const sql = `
     SELECT cols.table_name, cols.column_name, cols.data_type, cons.constraint_type

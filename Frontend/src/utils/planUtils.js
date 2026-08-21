@@ -52,6 +52,7 @@ const flattenPlan = (plan, nodes, edges, parentId = null, depth = 0, x = 0) => {
       indexName: plan['Index Name'],
       filter: plan['Filter'],
       joinFilter: plan['Join Filter'],
+      hashCond: plan['Hash Cond'],
       totalCost,
       rows: plan['Plan Rows'],
       width: plan['Plan Width'],

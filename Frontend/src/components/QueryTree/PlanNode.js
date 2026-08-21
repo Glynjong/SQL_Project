@@ -1,7 +1,7 @@
 import React from 'react';
 import { Handle, Position } from 'reactflow';
 import { costColor } from '../../utils/planUtils';
-import '../../../App.css';
+import '../../App.css';
 
 export const PlanNode = ({ data }) => {
   const color = costColor(data.totalCost);
@@ -23,6 +23,7 @@ export const PlanNode = ({ data }) => {
         )}
         {data.indexName && <div className="plan-node-index">🗂 {data.indexName}</div>}
         {data.filter && <div className="plan-node-filter">🔍 {data.filter}</div>}
+        {data.hashCond && <div className="plan-node-filter">⚙️ Hash Cond: {data.hashCond}</div>}
         {data.joinFilter && <div className="plan-node-filter">🔗 {data.joinFilter}</div>}
 
         <div className="plan-node-stats">
