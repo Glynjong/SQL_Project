@@ -8,8 +8,6 @@ import { useTabs } from './hooks/useTabs';
 import { useQueryRunner } from './hooks/useQueryRunner';
 import { useSchemaVisualizer } from './hooks/useSchemaVisualizer';
 import { useQueryTree } from './hooks/useQueryTree';
-import { useLogicalTree } from './hooks/useLogicalTree';
-import { useProvSQL } from './hooks/useProvSQL';
 import { runQuery } from './utils/apiUtils';
 import './App.css';
 
@@ -19,9 +17,7 @@ function App() {
   const queryRunner = useQueryRunner();
   const schemaVisualizer = useSchemaVisualizer();
   const queryTree = useQueryTree();
-  const logicalTree = useLogicalTree();
-  const provSQL = useProvSQL();
-
+  
   // Popup state for table data
   const [popup, setPopup] = useState({ tableName: null, data: [], isLoading: false, error: null });
 
@@ -174,33 +170,6 @@ function App() {
             onStepClick={queryTree.handleStepClick}
             onStepNext={queryTree.handleStepNext}
             onStepPrev={queryTree.handleStepPrev}
-            // Logical Tree (AST) tab
-            astNodes={logicalTree.astNodes}
-            astEdges={logicalTree.astEdges}
-            onAstNodesChange={logicalTree.onAstNodesChange}
-            onAstEdgesChange={logicalTree.onAstEdgesChange}
-            selectedAstNode={logicalTree.selectedAstNode}
-            onAstNodeClick={logicalTree.setSelectedAstNode}
-            astLoading={logicalTree.astLoading}
-            astError={logicalTree.astError}
-            onParseAST={logicalTree.fetchAndParseAST}
-            // ProvSQL Provenance tab
-            provRows={provSQL.provRows}
-            provFields={provSQL.provFields}
-            selectedToken={provSQL.selectedToken}
-            circuitNodes={provSQL.circuitNodes}
-            circuitEdges={provSQL.circuitEdges}
-            onCircuitNodesChange={provSQL.onCircuitNodesChange}
-            onCircuitEdgesChange={provSQL.onCircuitEdgesChange}
-            provLoading={provSQL.provLoading}
-            circuitLoading={provSQL.circuitLoading}
-            provError={provSQL.provError}
-            provStatus={provSQL.provStatus}
-            statusLoading={provSQL.statusLoading}
-            onFetchProvStatus={provSQL.fetchStatus}
-            onEnableProvenance={provSQL.enableProvenance}
-            onFetchProvenance={provSQL.fetchProvenance}
-            onFetchCircuit={provSQL.fetchCircuit}
           />
         );
 

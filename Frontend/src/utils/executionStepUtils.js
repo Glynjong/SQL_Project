@@ -32,9 +32,9 @@ export const extractExecutionSteps = (plan, originalQuery) => {
       planWidth: node['Plan Width'] || 0,
       
       // Actual metrics (from ANALYZE)
-      actualRows,
-      actualLoops,
-      actualTotalTime,
+      actualRows: node['Actual Rows'] || 0,
+      actualLoops: node['Actual Loops'] || 0,
+      actualTotalTime: actualTime,
       actualTimings: node['Actual Startup Time'] || 0,
       buffers: node['Shared Hit Blocks'] || 0,
       

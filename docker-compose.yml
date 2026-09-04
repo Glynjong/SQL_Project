@@ -1,16 +1,16 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database (custom image: postgres:15-alpine + ProvSQL extension)
   postgres:
-    image: postgres:15-alpine
+    build: ./Postgres
     container_name: sql-debugger-postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 1
       POSTGRES_DB: SQL_Database
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -29,12 +29,12 @@ services:
       - "5000:5000"
     volumes:
       - ./Backend:/app
-      - /app/node_modules
+      - backend_node_modules:/app/node_modules
     environment:
       NODE_ENV: development
       DB_USER: postgres
       DB_PASSWORD: 1
-      DB_HOST: host.docker.internal
+      DB_HOST: postgres # FIXED: Use container service name instead of host.docker.internal
       DB_PORT: 5432
       DB_NAME: SQL_Database
     command: npm run dev
@@ -43,6 +43,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    extra_hosts: # FIXED: Enables reliable host resolution across Docker environments
+      - "host.docker.internal:host-gateway"
 
   # Frontend Server
   frontend:
@@ -76,11 +78,20 @@ services:
       - sql-debugger-network
     volumes:
       - pgadmin_data:/var/lib/pgadmin
+      # Pre-registers the "postgres" service as a server in pgAdmin's tree.
+      # Only imported the first time pgAdmin initializes its config db inside
+      # pgadmin_data (see DOCKER_GUIDE.md's "down -v" note) — after that,
+      # edits here won't apply to an already-initialized volume.
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
   postgres_data:
   pgadmin_data:
+  backend_node_modules:
 
 networks:
   sql-debugger-network:

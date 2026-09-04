@@ -543,6 +543,50 @@ body { background: var(--bg); color: var(--text); }
   position: relative;
 }
 
+/* Wrapper for the Logical Tree / ProvSQL tabs — unlike the physical plan's
+   ReactFlow canvas (which manages its own pan/zoom via tree-canvas-wrap),
+   these panels need normal document flow and scrolling. */
+.tree-panel-wrap {
+  flex: 1;
+  min-height: 560px;
+  padding: 16px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Query Tree Sub-Navigation (Physical / Logical / ProvSQL) ──────────── */
+.tree-subtabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 16px 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.tree-subtab {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tree-subtab:hover {
+  color: var(--text-mid);
+}
+
+.tree-subtab--active {
+  color: var(--blue);
+  border-bottom-color: var(--blue);
+}
+
 /* ─── Plan Node Cards ─────────────────────────────────────────────────────── */
 .plan-node {
   background: var(--surface);

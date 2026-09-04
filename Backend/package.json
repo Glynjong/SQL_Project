@@ -15,7 +15,8 @@
   "dependencies": {
     "cors": "^2.8.6",
     "express": "^5.2.1",
-    "pg": "^8.17.2"
+    "pg": "^8.17.2",
+    "pgsql-parser": "^13.16.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
