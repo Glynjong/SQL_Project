@@ -8,6 +8,7 @@ export const useSchemaVisualizer = () => {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [schemaData, setSchemaData] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const onConnect = useCallback(
     (params) =>
@@ -30,11 +31,15 @@ export const useSchemaVisualizer = () => {
 
   const loadSchemaMetadata = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const data = await fetchSchemaMetadata();
       setSchemaData(data);
+      return data;
     } catch (err) {
       console.error('Failed to load schema metadata:', err);
+      setError(err.message);
+      return {};
     } finally {
       setIsLoading(false);
     }
@@ -75,10 +80,21 @@ export const useSchemaVisualizer = () => {
   };
 
   const addAllTablesToCanvas = async () => {
-    if (Object.keys(schemaData).length === 0) return;
+    // Self-healing: if metadata was never loaded (or the one-time mount
+    // fetch failed — e.g. hit before the backend was ready), retry here
+    // instead of silently doing nothing, which is what used to happen.
+    let currentSchemaData = schemaData;
+    if (Object.keys(currentSchemaData).length === 0) {
+      currentSchemaData = await loadSchemaMetadata();
+    }
+    if (Object.keys(currentSchemaData).length === 0) {
+      // Fetch genuinely returned zero tables (either a real error, now
+      // visible via `error`, or the database truly has none in `public`).
+      return;
+    }
 
     const newNodes = [];
-    const tableNames = Object.keys(schemaData);
+    const tableNames = Object.keys(currentSchemaData);
     
     // Create grid layout for tables
     const itemsPerRow = Math.ceil(Math.sqrt(tableNames.length));
@@ -91,7 +107,7 @@ export const useSchemaVisualizer = () => {
 
       const row = Math.floor(index / itemsPerRow);
       const col = index % itemsPerRow;
-      const cols = schemaData[tableName];
+      const cols = currentSchemaData[tableName];
       
       const node = createDatabaseNode(tableName, cols);
       node.position = {
@@ -132,6 +148,7 @@ export const useSchemaVisualizer = () => {
     onConnect,
     schemaData,
     isLoading,
+    error,
     loadSchemaMetadata,
     addTableToCanvas,
     addAllTablesToCanvas,

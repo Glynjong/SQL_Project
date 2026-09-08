@@ -16,19 +16,25 @@ export function transformASTToReactFlow(ast) {
 
   function walk(obj, parentId = null, depth = 0, nodeLabel = 'AST Root') {
     const nodeId = `ast_${++idCounter}`;
-    if (!levelCounts[depth]) levelCounts[depth] = 0;
-    const xIndex = levelCounts[depth]++;
 
     let label = nodeLabel;
-    let details = obj;
+    let recurseTarget = obj;
 
-    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
-      const keys = Object.keys(obj);
-      if (keys.length === 1) {
-        label = keys[0];
-        details = obj[keys[0]];
-      }
+    // Collapse a chain of single-key wrapper objects into ONE node.
+    // pgsql-parser's real shape often double-wraps a tag, e.g.
+    // { SelectStmt: { SelectStmt: { targetList: [...], ... } } } — without
+    // this, each layer got its own box, producing a chain of identically-
+    // labeled nodes with nothing but the wrapper between them.
+    while (recurseTarget && typeof recurseTarget === 'object' && !Array.isArray(recurseTarget)) {
+      const keys = Object.keys(recurseTarget);
+      if (keys.length !== 1) break;
+      label = keys[0];
+      recurseTarget = recurseTarget[keys[0]];
     }
+
+    if (!levelCounts[depth]) levelCounts[depth] = 0;
+    const xIndex = levelCounts[depth]++;
+    const details = recurseTarget;
 
     nodes.push({
       id: nodeId,
@@ -67,10 +73,10 @@ export function transformASTToReactFlow(ast) {
       });
     }
 
-    if (Array.isArray(obj)) {
-      obj.forEach((item, idx) => walk(item, nodeId, depth + 1, `[${idx}]`));
-    } else if (obj && typeof obj === 'object') {
-      Object.entries(obj).forEach(([key, val]) => {
+    if (Array.isArray(recurseTarget)) {
+      recurseTarget.forEach((item, idx) => walk(item, nodeId, depth + 1, `[${idx}]`));
+    } else if (recurseTarget && typeof recurseTarget === 'object') {
+      Object.entries(recurseTarget).forEach(([key, val]) => {
         if (val !== null && typeof val === 'object') {
           walk(val, nodeId, depth + 1, key);
         } else if (val !== null && val !== undefined) {

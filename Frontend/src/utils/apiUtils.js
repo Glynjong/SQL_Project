@@ -43,18 +43,20 @@ export const fetchSchemaMetadata = async () => {
     ORDER BY cols.table_name, cols.ordinal_position;
   `;
   const data = await runQuery(sql);
-  if (data.success) {
-    return data.rows.reduce((acc, row) => {
-      if (!acc[row.table_name]) acc[row.table_name] = [];
-      acc[row.table_name].push({
-        name: row.column_name,
-        type: row.data_type,
-        constraint: row.constraint_type,
-      });
-      return acc;
-    }, {});
+  if (!data.success) {
+    // Surface the real reason instead of silently returning {} — a failed
+    // fetch here used to look identical to "there are just no tables yet."
+    throw new Error(data.error || 'Failed to load schema metadata');
   }
-  return {};
+  return data.rows.reduce((acc, row) => {
+    if (!acc[row.table_name]) acc[row.table_name] = [];
+    acc[row.table_name].push({
+      name: row.column_name,
+      type: row.data_type,
+      constraint: row.constraint_type,
+    });
+    return acc;
+  }, {});
 };
 
 export const fetchForeignKeys = async () => {

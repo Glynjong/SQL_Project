@@ -142,6 +142,48 @@ app.get('/provsql/status', async (req, res) => {
   }
 });
 
+// Resolve an INPUT gate's token back to the actual source row it came
+// from. add_provenance() gives each provenance-tracked table a hidden
+// `provsql` UUID column, and an INPUT gate's token IS that UUID — so we
+// can search enabled tables directly for a match, rather than relying on
+// circuit_subgraph()'s info1/info2 columns, whose exact meaning we
+// haven't confirmed for this ProvSQL version.
+app.post('/provsql/lookup-token', async (req, res) => {
+  const { token } = req.body;
+  if (!token) {
+    return res.status(400).json({ success: false, error: 'Token is required' });
+  }
+  try {
+    if (!(await requireProvSQL(res))) return;
+
+    const provTablesResult = await pool.query(`
+      SELECT c.relname AS table_name
+      FROM pg_attribute a
+      JOIN pg_class c ON c.oid = a.attrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE a.attname = 'provsql' AND n.nspname = 'public' AND c.relkind = 'r'
+      ORDER BY c.relname
+    `);
+
+    for (const { table_name: table } of provTablesResult.rows) {
+      // eslint-disable-next-line no-await-in-loop
+      const result = await pool.query(
+        `SELECT * FROM "${table}" WHERE provsql = $1 LIMIT 1`,
+        [token]
+      );
+      if (result.rowCount > 0) {
+        const { provsql, ...row } = result.rows[0];
+        return res.json({ success: true, found: true, table, row });
+      }
+    }
+
+    res.json({ success: true, found: false });
+  } catch (err) {
+    console.error('ProvSQL Token Lookup Error:', err.message);
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 // Enable provenance tracking on a base table (adds ProvSQL's hidden UUID column).
 // Must be called once per table before that table's rows carry provenance.
 app.post('/provsql/enable-table', async (req, res) => {
@@ -199,49 +241,56 @@ app.post('/provsql/provenance', async (req, res) => {
 
 // ProvSQL Circuit Export Endpoint
 // Walks the provenance circuit rooted at a token using ProvSQL's
-// circuit_subgraph() introspection function, which returns every gate
-// edge (f -> t) reachable from that token along with each gate's type
-// (input / plus / times / monus / agg / ...). We return this as a
-// structured graph rather than relying on a DOT-export SQL function,
-// since ProvSQL's own visual export (view_circuit) targets ASCII/graph-easy
-// output, not a raw DOT string.
+// circuit_subgraph() introspection function. Verified against a live
+// v1.5.0 install — its real signature is:
+//   circuit_subgraph(root uuid, max_depth integer DEFAULT 8)
+//     RETURNS TABLE(node uuid, parent uuid, child_pos integer,
+//                   gate_type text, info1 text, info2 text, depth integer)
+// This is a node-per-row model with a parent pointer (parent IS NULL marks
+// the root), not an edge-list — each row already carries its own depth
+// from the root, computed by ProvSQL itself, which we pass straight
+// through rather than recomputing client-side.
 app.post('/provsql/circuit', async (req, res) => {
-  const { targetToken } = req.body;
+  const { targetToken, maxDepth } = req.body;
   if (!targetToken) {
     return res.status(400).json({ success: false, error: 'Target provenance token UUID is required' });
   }
   try {
     if (!(await requireProvSQL(res))) return;
 
+    const depthLimit = Number.isInteger(maxDepth) ? maxDepth : 8;
     const result = await pool.query(
-      'SELECT f, t, gate_type, table_name, extra FROM circuit_subgraph($1)',
-      [targetToken]
+      'SELECT node, parent, child_pos, gate_type, info1, info2, depth FROM circuit_subgraph($1, $2)',
+      [targetToken, depthLimit]
     );
 
-    const gateIds = new Set();
+    const nodesById = new Map();
     const edges = [];
+
     result.rows.forEach((row) => {
-      gateIds.add(row.f);
-      if (row.t) {
-        gateIds.add(row.t);
-        edges.push({ source: row.f, target: row.t, gateType: row.gate_type });
+      if (!nodesById.has(row.node)) {
+        nodesById.set(row.node, {
+          id: row.node,
+          gateType: row.gate_type,
+          isRoot: row.parent === null,
+          depth: row.depth,
+          info1: row.info1,
+          info2: row.info2
+        });
+      }
+      if (row.parent) {
+        // parent -> node: the parent gate is derived FROM this node (the
+        // usual root-at-top-to-leaves-at-bottom circuit orientation).
+        edges.push({ source: row.parent, target: row.node, childPos: row.child_pos });
       }
     });
 
-    // Gate type for every f value comes from its own row(s); leaves (no
-    // outgoing edge as f, i.e. only ever appear as t) are input gates.
-    const gateTypeById = {};
-    result.rows.forEach((row) => {
-      gateTypeById[row.f] = row.gate_type;
+    res.json({
+      success: true,
+      targetToken,
+      nodes: Array.from(nodesById.values()),
+      edges
     });
-
-    const nodes = Array.from(gateIds).map((id) => ({
-      id,
-      gateType: gateTypeById[id] || 'input',
-      isRoot: id === targetToken
-    }));
-
-    res.json({ success: true, targetToken, nodes, edges });
   } catch (err) {
     console.error('ProvSQL Circuit Error:', err.message);
     res.status(400).json({ success: false, error: err.message });

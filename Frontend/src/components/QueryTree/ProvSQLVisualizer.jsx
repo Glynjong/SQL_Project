@@ -103,7 +103,22 @@ export function ProvSQLVisualizer({
   statusLoading,
   onEnableProvenance,
   onRerun,
+  onLookupToken,
 }) {
+  const [selectedCircuitNode, setSelectedCircuitNode] = useState(null);
+  const [sourceRow, setSourceRow] = useState(null);
+  const [sourceRowLoading, setSourceRowLoading] = useState(false);
+
+  const handleCircuitNodeClick = async (evt, node) => {
+    setSelectedCircuitNode(node);
+    setSourceRow(null);
+    if (node.data?.gateType === 'input' && onLookupToken) {
+      setSourceRowLoading(true);
+      const result = await onLookupToken(node.data.fullToken);
+      setSourceRow(result);
+      setSourceRowLoading(false);
+    }
+  };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, minHeight: '520px' }}>
       <SetupPanel
@@ -118,6 +133,29 @@ export function ProvSQLVisualizer({
           {error}
         </div>
       )}
+
+      <div>
+        <button
+          onClick={onRerun}
+          disabled={isLoading}
+          style={{
+            padding: '8px 18px',
+            background: isLoading ? '#94a3b8' : '#16a34a',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '13px',
+            fontWeight: 600,
+            cursor: isLoading ? 'not-allowed' : 'pointer'
+          }}
+        >
+          {isLoading ? 'Running…' : '▶ Run Provenance Query'}
+        </button>
+        <span style={{ marginLeft: '10px', fontSize: '12px', color: '#64748b' }}>
+          Runs the query currently in the box above. This tab doesn't auto-refresh when you edit
+          the query — click here after changing it.
+        </span>
+      </div>
 
       {/* Query Output Table with Provenance Tokens */}
       <div style={{ flex: '0 0 220px', overflow: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', background: '#ffffff' }}>
@@ -141,7 +179,7 @@ export function ProvSQLVisualizer({
                 return (
                   <tr
                     key={idx}
-                    onClick={() => token && onRowSelect(token)}
+                    onClick={() => { if (token) { onRowSelect(token); setSelectedCircuitNode(null); setSourceRow(null); } }}
                     title={token ? `Click to view provenance circuit for ${token}` : 'No provenance token on this row — enable provenance on its source table(s)'}
                     style={{
                       cursor: token ? 'pointer' : 'default',
@@ -165,28 +203,78 @@ export function ProvSQLVisualizer({
       </div>
 
       {/* Provenance DAG Circuit Visualizer */}
-      <div style={{ flex: 1, position: 'relative', border: '1px solid #e2e8f0', borderRadius: '8px', background: '#f8fafc', minHeight: '260px' }}>
-        {circuitLoading && (
-          <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 10, background: '#fff', padding: '8px 16px', borderRadius: '6px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            Loading provenance circuit DAG...
+      <div style={{ display: 'flex', gap: '16px', flex: 1, minHeight: '260px' }}>
+        <div style={{ flex: 1, position: 'relative', border: '1px solid #e2e8f0', borderRadius: '8px', background: '#f8fafc' }}>
+          {circuitLoading && (
+            <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 10, background: '#fff', padding: '8px 16px', borderRadius: '6px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+              Loading provenance circuit DAG...
+            </div>
+          )}
+          {!circuitLoading && circuitNodes.length === 0 && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '13px', textAlign: 'center', padding: '0 24px' }}>
+              Click a row above with a provenance token to render its circuit — the Boolean semiring
+              operators (⊕ PLUS / ⊗ TIMES) that combined source tuples into this result.
+            </div>
+          )}
+          <ReactFlow
+            nodes={circuitNodes}
+            edges={circuitEdges}
+            onNodesChange={onCircuitNodesChange}
+            onEdgesChange={onCircuitEdgesChange}
+            onNodeClick={handleCircuitNodeClick}
+            fitView
+          >
+            <Background color="#cbd5e1" gap={16} />
+            <Controls />
+          </ReactFlow>
+        </div>
+
+        {selectedCircuitNode && (
+          <div style={{ width: '300px', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', background: '#ffffff', overflowY: 'auto' }}>
+            <h3 style={{ marginTop: 0, fontSize: '15px', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+              {selectedCircuitNode.data?.gateType?.toUpperCase() || 'Gate'} details
+            </h3>
+            <div style={{ fontSize: '12px', color: '#475569', marginBottom: '10px' }}>
+              <strong>Token:</strong>
+              <div style={{ wordBreak: 'break-all', fontFamily: 'monospace', marginTop: '2px' }}>
+                {selectedCircuitNode.data?.fullToken}
+              </div>
+            </div>
+
+            {selectedCircuitNode.data?.gateType === 'input' ? (
+              sourceRowLoading ? (
+                <p style={{ fontSize: '12px', color: '#64748b' }}>Looking up source row…</p>
+              ) : sourceRow?.found ? (
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#166534', marginBottom: '6px' }}>
+                    Originates from: {sourceRow.table}
+                  </div>
+                  <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
+                    <tbody>
+                      {Object.entries(sourceRow.row).map(([col, val]) => (
+                        <tr key={col}>
+                          <td style={{ padding: '3px 6px', fontWeight: 600, color: '#475569', verticalAlign: 'top' }}>{col}</td>
+                          <td style={{ padding: '3px 6px', color: '#0f172a', wordBreak: 'break-all' }}>{String(val)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : sourceRow && !sourceRow.found ? (
+                <p style={{ fontSize: '12px', color: '#64748b' }}>
+                  No matching row found — this row may have been deleted since the query ran, or its
+                  source table isn't currently provenance-enabled.
+                </p>
+              ) : null
+            ) : (
+              <p style={{ fontSize: '12px', color: '#64748b' }}>
+                This is a {selectedCircuitNode.data?.gateType?.toUpperCase() || 'derived'} gate — a
+                combination of other gates, not a single source row. Expand toward the leaves
+                (bottom of the diagram) to find the INPUT gates it was built from.
+              </p>
+            )}
           </div>
         )}
-        {!circuitLoading && circuitNodes.length === 0 && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '13px', textAlign: 'center', padding: '0 24px' }}>
-            Click a row above with a provenance token to render its circuit — the Boolean semiring
-            operators (⊕ PLUS / ⊗ TIMES) that combined source tuples into this result.
-          </div>
-        )}
-        <ReactFlow
-          nodes={circuitNodes}
-          edges={circuitEdges}
-          onNodesChange={onCircuitNodesChange}
-          onEdgesChange={onCircuitEdgesChange}
-          fitView
-        >
-          <Background color="#cbd5e1" gap={16} />
-          <Controls />
-        </ReactFlow>
       </div>
     </div>
   );

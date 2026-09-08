@@ -56,6 +56,7 @@ export const QueryTree = ({
   statusLoading,
   onFetchProvStatus,
   onEnableProvenance,
+  onLookupToken,
   onFetchProvenance,
   onFetchCircuit,
 }) => {
@@ -203,6 +204,7 @@ export const QueryTree = ({
             provStatus={provStatus}
             statusLoading={statusLoading}
             onEnableProvenance={onEnableProvenance}
+            onLookupToken={onLookupToken}
             onRerun={() => onFetchProvenance(query)}
           />
         </div>

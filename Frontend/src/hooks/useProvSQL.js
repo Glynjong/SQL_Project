@@ -7,7 +7,12 @@ const getApiUrl = (endpoint) => {
 };
 
 // Node styling per ProvSQL gate type. plus/times/monus/agg are the
-// semiring operators; input is a leaf (a source tuple).
+// semiring operators; input is a leaf (a source tuple). gate_type comes
+// back as plain text from circuit_subgraph() — 'input' confirmed directly
+// against a live install; the operator names are ProvSQL's documented
+// semiring gates but haven't all been individually confirmed the same way,
+// so anything unrecognized falls back to `default` rather than being
+// mislabeled as a leaf.
 const GATE_STYLE = {
   input: { background: '#ffffff', border: '1px solid #10b981', shape: '6px' },
   plus: { background: '#e0e7ff', border: '2px solid #4f46e5', shape: '40px' },
@@ -16,6 +21,7 @@ const GATE_STYLE = {
   agg: { background: '#f3e8ff', border: '2px solid #9333ea', shape: '40px' },
   zero: { background: '#f1f5f9', border: '1px dashed #94a3b8', shape: '50%' },
   one: { background: '#f1f5f9', border: '1px dashed #94a3b8', shape: '50%' },
+  default: { background: '#f8fafc', border: '1px solid #94a3b8', shape: '10px' },
 };
 
 const GATE_LABEL = {
@@ -38,33 +44,17 @@ export function transformCircuitToReactFlow(circuit) {
   const levelYOffset = 100;
   const levelXSpacing = 170;
 
-  const childrenOf = new Map();
-  rawEdges.forEach((e) => {
-    if (!childrenOf.has(e.source)) childrenOf.set(e.source, []);
-    childrenOf.get(e.source).push(e.target);
-  });
-
-  const root = rawNodes.find((n) => n.isRoot) || rawNodes[0];
-  const depths = new Map([[root.id, 0]]);
-  const queue = [root.id];
-  let head = 0;
-  while (head < queue.length) {
-    const current = queue[head++];
-    const currDepth = depths.get(current);
-    (childrenOf.get(current) || []).forEach((childId) => {
-      if (!depths.has(childId)) {
-        depths.set(childId, currDepth + 1);
-        queue.push(childId);
-      }
-    });
-  }
-
+  // circuit_subgraph() already computes each node's depth from the root
+  // (server-verified, not guessed) — use it directly instead of
+  // recomputing via BFS, which could disagree on it for a true DAG with
+  // shared subexpressions (a node reachable at different depths via
+  // different parents).
   const depthCounts = {};
   const nodes = rawNodes.map((n) => {
-    const depth = depths.has(n.id) ? depths.get(n.id) : 0;
+    const depth = typeof n.depth === 'number' ? n.depth : 0;
     if (!depthCounts[depth]) depthCounts[depth] = 0;
     const xIndex = depthCounts[depth]++;
-    const style = GATE_STYLE[n.gateType] || GATE_STYLE.input;
+    const style = GATE_STYLE[n.gateType] || GATE_STYLE.default;
 
     return {
       id: n.id,
@@ -72,7 +62,9 @@ export function transformCircuitToReactFlow(circuit) {
       data: {
         label: n.isRoot ? `${GATE_LABEL[n.gateType] || n.gateType}\n(result)` : (GATE_LABEL[n.gateType] || n.gateType),
         gateType: n.gateType,
-        fullToken: n.id
+        fullToken: n.id,
+        info1: n.info1,
+        info2: n.info2
       },
       position: { x: xIndex * levelXSpacing + 40, y: depth * levelYOffset + 40 },
       style: {
@@ -149,6 +141,20 @@ export function useProvSQL() {
     }
   }, [fetchStatus]);
 
+  const lookupToken = useCallback(async (token) => {
+    if (!token) return { success: false, error: 'No token specified' };
+    try {
+      const response = await fetch(getApiUrl('/provsql/lookup-token'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+      return await response.json();
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }, []);
+
   const fetchProvenance = useCallback(async (sql) => {
     if (!sql || !sql.trim()) return;
     setProvLoading(true);
@@ -163,6 +169,11 @@ export function useProvSQL() {
       if (data.success) {
         setProvRows(data.rows || []);
         setProvFields(data.fields || []);
+        // Clear the old circuit diagram/selection — it belongs to the
+        // previous query's tokens, which may not even exist in this result.
+        setSelectedToken(null);
+        setCircuitNodes([]);
+        setCircuitEdges([]);
       } else {
         setProvError(data.error || 'Failed to fetch provenance data');
       }
@@ -171,7 +182,7 @@ export function useProvSQL() {
     } finally {
       setProvLoading(false);
     }
-  }, []);
+  }, [setCircuitNodes, setCircuitEdges]);
 
   const fetchCircuit = useCallback(async (targetToken) => {
     if (!targetToken) return;
@@ -214,6 +225,7 @@ export function useProvSQL() {
     statusLoading,
     fetchStatus,
     enableProvenance,
+    lookupToken,
     fetchProvenance,
     fetchCircuit
   };

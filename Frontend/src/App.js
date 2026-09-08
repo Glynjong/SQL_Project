@@ -149,6 +149,8 @@ function App() {
             onNodeClick={handleSchemaNodeClick}
             onClearCanvas={schemaVisualizer.clearCanvas}
             onLoadAllTables={schemaVisualizer.addAllTablesToCanvas}
+            isLoading={schemaVisualizer.isLoading}
+            error={schemaVisualizer.error}
           />
         );
 
@@ -199,6 +201,7 @@ function App() {
             statusLoading={provSQL.statusLoading}
             onFetchProvStatus={provSQL.fetchStatus}
             onEnableProvenance={provSQL.enableProvenance}
+            onLookupToken={provSQL.lookupToken}
             onFetchProvenance={provSQL.fetchProvenance}
             onFetchCircuit={provSQL.fetchCircuit}
           />
