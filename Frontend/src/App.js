@@ -149,6 +149,7 @@ function App() {
             onNodeClick={handleSchemaNodeClick}
             onClearCanvas={schemaVisualizer.clearCanvas}
             onLoadAllTables={schemaVisualizer.addAllTablesToCanvas}
+            onCreateTable={schemaVisualizer.createTable}
             isLoading={schemaVisualizer.isLoading}
             error={schemaVisualizer.error}
           />
@@ -159,7 +160,6 @@ function App() {
           <QueryTree
             query={queryRunner.query}
             onQueryChange={queryRunner.setQuery}
-            onExplain={() => queryTree.analyzePlan(queryRunner.query)}
             onAnalyze={() => queryTree.analyzeExecution(queryRunner.query)}
             planNodes={queryTree.planNodes}
             planEdges={queryTree.planEdges}
@@ -202,6 +202,8 @@ function App() {
             onFetchProvStatus={provSQL.fetchStatus}
             onEnableProvenance={provSQL.enableProvenance}
             onLookupToken={provSQL.lookupToken}
+            tableResponsibility={provSQL.tableResponsibility}
+            responsibilityLoading={provSQL.responsibilityLoading}
             onFetchProvenance={provSQL.fetchProvenance}
             onFetchCircuit={provSQL.fetchCircuit}
           />

@@ -93,6 +93,49 @@ export function transformCircuitToReactFlow(circuit) {
   return { nodes, edges };
 }
 
+// Approximate Shapley-value "responsibility" of each source table for a
+// query result, using the recursive equal-split rule for read-once
+// monotone AND/OR formulas (Livshits, Bertossi & Kimelfeld, "The Shapley
+// Value of Tuples in Query Answering"). At every gate, its allocated share
+// is split equally among its children (mathematically exact for AND/OR of
+// symmetric inputs when each source tuple appears in the formula at most
+// once — the common case for simple joins/selections without self-joins
+// or UNIONed duplicate references). MONUS/AGG gates are treated the same
+// way as a pragmatic approximation; that split is NOT proven exact for
+// those gate types. Leaf (INPUT) shares are then summed by source table.
+export async function computeShapleyByTable(rootId, edges, lookupTokenFn) {
+  const childrenOf = new Map();
+  edges.forEach((e) => {
+    if (!childrenOf.has(e.source)) childrenOf.set(e.source, []);
+    childrenOf.get(e.source).push(e.target);
+  });
+
+  const leafShare = new Map();
+  (function recurse(id, allocated) {
+    const children = childrenOf.get(id) || [];
+    if (children.length === 0) {
+      leafShare.set(id, (leafShare.get(id) || 0) + allocated);
+      return;
+    }
+    const each = allocated / children.length;
+    children.forEach((childId) => recurse(childId, each));
+  })(rootId, 1);
+
+  const tableShare = {};
+  // Sequential, not Promise.all — leaf counts are small (typically a
+  // handful per circuit) and this keeps load on the lookup endpoint light.
+  for (const [leafId, share] of leafShare.entries()) {
+    // eslint-disable-next-line no-await-in-loop
+    const result = await lookupTokenFn(leafId);
+    const table = result?.found ? result.table : 'unresolved';
+    tableShare[table] = (tableShare[table] || 0) + shaze;
+  }
+
+  return Object.entries(tableShare)
+    .map(([table, share]) => ({ table, share }))
+    .sort((a, b) => b.share - a.share);
+}
+
 export function useProvSQL() {
   const [provRows, setProvRows] = useState([]);
   const [provFields, setProvFields] = useState([]);
@@ -107,6 +150,9 @@ export function useProvSQL() {
   // provenance on the right tables instead of failing silently.
   const [provStatus, setProvStatus] = useState({ installed: null, allTables: [], enabledTables: [] });
   const [statusLoading, setStatusLoading] = useState(false);
+
+  const [tableResponsibility, setTableResponsibility] = useState(null);
+  const [responsibilityLoading, setResponsibilityLoading] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     setStatusLoading(true);
@@ -174,6 +220,7 @@ export function useProvSQL() {
         setSelectedToken(null);
         setCircuitNodes([]);
         setCircuitEdges([]);
+        setTableResponsibility(null);
       } else {
         setProvError(data.error || 'Failed to fetch provenance data');
       }
@@ -189,6 +236,7 @@ export function useProvSQL() {
     setSelectedToken(targetToken);
     setCircuitLoading(true);
     setProvError(null);
+    setTableResponsibility(null);
     try {
       const response = await fetch(getApiUrl('/provsql/circuit'), {
         method: 'POST',
@@ -200,15 +248,29 @@ export function useProvSQL() {
         const { nodes, edges } = transformCircuitToReactFlow(data);
         setCircuitNodes(nodes);
         setCircuitEdges(edges);
+        setCircuitLoading(false);
+
+        // Compute responsibility off the freshly-fetched data directly
+        // (not hook state, which wouldn't have updated yet in this same
+        // call) rather than from a second, potentially-stale read.
+        setResponsibilityLoading(true);
+        try {
+          const breakdown = await computeShapleyByTable(targetToken, data.edges || [], lookupToken);
+          setTableResponsibility(breakdown);
+        } catch (shapleyErr) {
+          console.error('Failed to compute table responsibility:', shapleyErr);
+        } finally {
+          setResponsibilityLoading(false);
+        }
       } else {
         setProvError(data.error || 'Failed to fetch provenance circuit');
+        setCircuitLoading(false);
       }
     } catch (err) {
       setProvError(err.message);
-    } finally {
       setCircuitLoading(false);
     }
-  }, [setCircuitNodes, setCircuitEdges]);
+  }, [setCircuitNodes, setCircuitEdges, lookupToken]);
 
   return {
     provRows,
@@ -223,6 +285,8 @@ export function useProvSQL() {
     provError,
     provStatus,
     statusLoading,
+    tableResponsibility,
+    responsibilityLoading,
     fetchStatus,
     enableProvenance,
     lookupToken,

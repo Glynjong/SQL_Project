@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useNodesState, useEdgesState, addEdge, MarkerType } from 'reactflow';
-import { fetchForeignKeys, fetchSchemaMetadata } from '../utils/apiUtils';
-import { createForeignKeyEdges, createDatabaseNode, nodeTableExists } from '../utils/schemaUtils';
+import { fetchForeignKeys, fetchSchemaMetadata, runQuery } from '../utils/apiUtils';
+import { createForeignKeyEdges, createDatabaseNode, nodeTableExists, buildCreateTableSQL } from '../utils/schemaUtils';
 
 export const useSchemaVisualizer = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -45,10 +45,10 @@ export const useSchemaVisualizer = () => {
     }
   };
 
-  const addTableToCanvas = async (tableName) => {
+  const addTableToCanvas = async (tableName, colsOverride) => {
     if (nodeTableExists(nodes, tableName)) return;
 
-    const cols = schemaData[tableName];
+    const cols = colsOverride || schemaData[tableName];
     const newNode = createDatabaseNode(tableName, cols);
     setNodes((nds) => {
       const updated = [...nds, newNode];
@@ -77,6 +77,26 @@ export const useSchemaVisualizer = () => {
   const clearCanvas = () => {
     setNodes([]);
     setEdges([]);
+  };
+
+  // Builds and runs a CREATE TABLE statement from a structured spec (see
+  // AddTableModal), then refreshes metadata and drops the new table onto
+  // the canvas — so "Add Table" behaves like a real schema change, not
+  // just a visual mockup.
+  const createTable = async (spec) => {
+    let sql;
+    try {
+      sql = buildCreateTableSQL(spec);
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+    const result = await runQuery(sql);
+    if (!result.success) {
+      return { success: false, error: result.error, sql };
+    }
+    const freshData = await loadSchemaMetadata();
+    await addTableToCanvas(spec.tableName, freshData[spec.tableName]);
+    return { success: true, sql };
   };
 
   const addAllTablesToCanvas = async () => {
@@ -152,6 +172,7 @@ export const useSchemaVisualizer = () => {
     loadSchemaMetadata,
     addTableToCanvas,
     addAllTablesToCanvas,
+    createTable,
     clearCanvas,
   };
 };

@@ -47,3 +47,46 @@ export const createForeignKeyEdges = (fkRows, canvasTableNames) =>
     }));
 
 export const nodeTableExists = (nodes, tableName) => nodes.some((n) => n.id === tableName);
+
+// Column type choices offered in the Add Table form — a practical subset
+// of Postgres types, not exhaustive.
+export const COLUMN_TYPES = [
+  'SERIAL', 'INTEGER', 'BIGINT', 'NUMERIC(10,2)', 'VARCHAR(50)', 'VARCHAR(100)',
+  'TEXT', 'BOOLEAN', 'DATE', 'TIMESTAMP', 'UUID',
+];
+
+const isValidIdentifier = (name) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name);
+
+// Builds a CREATE TABLE statement from the Add Table form's structured
+// spec: { tableName, columns: [{ name, type, primaryKey, notNull, unique }] }.
+// Identifiers are validated (not just interpolated) since this becomes a
+// real DDL statement executed against the database.
+export const buildCreateTableSQL = ({ tableName, columns }) => {
+  if (!tableName || !isValidIdentifier(tableName)) {
+    throw new Error('Table name must start with a letter or underscore and contain only letters, numbers, and underscores.');
+  }
+  if (!columns || columns.length === 0) {
+    throw new Error('Add at least one column.');
+  }
+
+  const colDefs = columns.map((col) => {
+    if (!col.name || !isValidIdentifier(col.name)) {
+      throw new Error(`Invalid column name: "${col.name}"`);
+    }
+    if (!col.type) {
+      throw new Error(`Column "${col.name}" needs a type.`);
+    }
+    let def = `${col.name} ${col.type}`;
+    if (col.primaryKey) def += ' PRIMARY KEY';
+    if (col.notNull && !col.primaryKey) def += ' NOT NULL';
+    if (col.unique && !col.primaryKey) def += ' UNIQUE';
+    return def;
+  });
+
+  const pkCount = columns.filter((c) => c.primaryKey).length;
+  if (pkCount > 1) {
+    throw new Error('Only one column can be the primary key in this form — use the Query Runner for composite keys.');
+  }
+
+  return `CREATE TABLE ${tableName} (\n  ${colDefs.join(',\n  ')}\n);`;
+};

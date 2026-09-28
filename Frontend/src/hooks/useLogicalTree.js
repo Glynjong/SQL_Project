@@ -6,6 +6,33 @@ const getApiUrl = (endpoint) => {
   return `${baseUrl}${endpoint}`;
 };
 
+// Bookkeeping fields that clutter the tree without adding insight for most
+// queries — kept in the side panel's raw JSON, just not rendered as their
+// own boxes. location/stmt_len are character offsets into the original SQL
+// text; the others are near-always-default flags on every statement.
+const NOISY_LEAF_KEYS = new Set([
+  'location', 'stmt_len', 'length',
+]);
+
+// Visual category per node label, so the tree is scannable by shape/color
+// at a glance instead of only by reading every box's text.
+const CATEGORIES = {
+  statement: { test: (l) => /Stmt$/.test(l), color: '#2563eb', bg: '#eff6ff', icon: '📄', name: 'Statement' },
+  reference: { test: (l) => ['RangeVar', 'ColumnRef', 'fields'].includes(l), color: '#059669', bg: '#ecfdf5', icon: '🔗', name: 'Reference' },
+  operator: { test: (l) => ['A_Expr', 'BoolExpr', 'FuncCall', 'SubLink'].includes(l), color: '#d97706', bg: '#fffbeb', icon: '⚙️', name: 'Operator / Function' },
+  literal: { test: (l) => ['A_Const', 'A_Star', 'ival', 'sval', 'fval'].includes(l) || /^\d+$/.test(l), color: '#7c3aed', bg: '#f5f3ff', icon: '🔢', name: 'Literal' },
+  clause: { test: (l) => /Clause$|List$/.test(l) || ['ResTarget', 'SortBy'].includes(l), color: '#0891b2', bg: '#ecfeff', icon: '📋', name: 'Clause / List' },
+};
+
+function categorize(label) {
+  for (const key of Object.keys(CATEGORIES)) {
+    if (CATEGORIES[key].test(label)) return CATEGORIES[key];
+  }
+  return { color: '#475569', bg: '#f8fafc', icon: '⚪', name: 'Other' };
+}
+
+export { CATEGORIES };
+
 export function transformASTToReactFlow(ast) {
   const nodes = [];
   const edges = [];
@@ -35,23 +62,25 @@ export function transformASTToReactFlow(ast) {
     if (!levelCounts[depth]) levelCounts[depth] = 0;
     const xIndex = levelCounts[depth]++;
     const details = recurseTarget;
+    const category = categorize(label);
 
     nodes.push({
       id: nodeId,
       type: 'default',
       data: {
-        label,
+        label: `${category.icon} ${label}`,
         raw: obj,
         details,
-        nodeType: label
+        nodeType: label,
+        category: category.name
       },
       position: {
         x: xIndex * levelXSpacing,
         y: depth * levelYOffset
       },
       style: {
-        background: '#ffffff',
-        border: '1px solid #3b82f6',
+        background: category.bg,
+        border: `1.5px solid ${category.color}`,
         borderRadius: '8px',
         padding: '8px 12px',
         fontSize: '12px',
@@ -77,6 +106,7 @@ export function transformASTToReactFlow(ast) {
       recurseTarget.forEach((item, idx) => walk(item, nodeId, depth + 1, `[${idx}]`));
     } else if (recurseTarget && typeof recurseTarget === 'object') {
       Object.entries(recurseTarget).forEach(([key, val]) => {
+        if (NOISY_LEAF_KEYS.has(key)) return;
         if (val !== null && typeof val === 'object') {
           walk(val, nodeId, depth + 1, key);
         } else if (val !== null && val !== undefined) {
@@ -87,7 +117,7 @@ export function transformASTToReactFlow(ast) {
           nodes.push({
             id: leafId,
             type: 'default',
-            data: { label: `${key}: ${String(val)}`, raw: val, details: val },
+            data: { label: `${key}: ${String(val)}`, raw: val, details: val, nodeType: key, category: 'Literal' },
             position: { x: leafX * levelXSpacing, y: (depth + 1) * levelYOffset },
             style: {
               background: '#f8fafc',

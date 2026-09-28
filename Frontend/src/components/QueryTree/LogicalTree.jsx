@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactFlow, { Background, Controls } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { CATEGORIES } from '../../hooks/useLogicalTree';
 
 // Plain-English descriptions of the Postgres AST node types you'll actually
 // run into while exploring SELECT/INSERT/UPDATE/DELETE queries. Not
@@ -54,46 +55,66 @@ export function LogicalTree({
   error
 }) {
   return (
-    <div style={{ display: 'flex', width: '100%', flex: 1, minHeight: '520px', gap: '16px' }}>
-      <div style={{ flex: 1, position: 'relative', border: '1px solid #e2e8f0', borderRadius: '8px', background: '#f8fafc' }}>
-        {isLoading && (
-          <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 10, background: '#fff', padding: '8px 16px', borderRadius: '6px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            Parsing AST...
-          </div>
-        )}
-        {error && (
-          <div style={{ position: 'absolute', top: 20, left: 20, right: 20, zIndex: 10, background: '#fef2f2', border: '1px solid #fca5a5', color: '#991b1b', padding: '12px', borderRadius: '6px' }}>
-            {error}
-          </div>
-        )}
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onNodeClick={(evt, node) => onNodeClick(node)}
-          fitView
-        >
-          <Background color="#cbd5e1" gap={16} />
-          <Controls />
-        </ReactFlow>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: '520px', gap: '10px' }}>
+      <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', fontSize: '11px', color: '#475569', padding: '2px 4px' }}>
+        {Object.values(CATEGORIES).map((c) => (
+          <span key={c.name} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: c.bg, border: `1.5px solid ${c.color}`, display: 'inline-block' }} />
+            {c.icon} {c.name}
+          </span>
+        ))}
+        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#f8fafc', border: '1px solid #cbd5e1', display: 'inline-block' }} />
+          Value (leaf)
+        </span>
       </div>
 
-      {selectedNode && (
-        <div style={{ width: '320px', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', background: '#ffffff', overflowY: 'auto' }}>
-          <h3 style={{ marginTop: 0, fontSize: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
-            AST Node: {selectedNode.data?.nodeType || 'Details'}
-          </h3>
-          {describeNode(selectedNode.data?.nodeType) && (
-            <p style={{ fontSize: '13px', color: '#334155', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '10px 12px', margin: '0 0 12px 0' }}>
-              {describeNode(selectedNode.data?.nodeType)}
-            </p>
+      <div style={{ display: 'flex', width: '100%', flex: 1, gap: '16px' }}>
+        <div style={{ flex: 1, position: 'relative', border: '1px solid #e2e8f0', borderRadius: '8px', background: '#f8fafc' }}>
+          {isLoading && (
+            <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 10, background: '#fff', padding: '8px 16px', borderRadius: '6px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+              Parsing AST...
+            </div>
           )}
-          <pre style={{ background: '#f1f5f9', padding: '12px', borderRadius: '6px', fontSize: '12px', overflowX: 'auto' }}>
-            {JSON.stringify(selectedNode.data?.details || selectedNode.data?.raw, null, 2)}
-          </pre>
+          {error && (
+            <div style={{ position: 'absolute', top: 20, left: 20, right: 20, zIndex: 10, background: '#fef2f2', border: '1px solid #fca5a5', color: '#991b1b', padding: '12px', borderRadius: '6px' }}>
+              {error}
+            </div>
+          )}
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onNodeClick={(evt, node) => onNodeClick(node)}
+            fitView
+          >
+            <Background color="#cbd5e1" gap={16} />
+            <Controls />
+          </ReactFlow>
         </div>
-      )}
+
+        {selectedNode && (
+          <div style={{ width: '320px', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', background: '#ffffff', overflowY: 'auto' }}>
+            <h3 style={{ marginTop: 0, fontSize: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+              AST Node: {selectedNode.data?.nodeType || 'Details'}
+              {selectedNode.data?.category && (
+                <span style={{ display: 'block', fontSize: '11px', fontWeight: 400, color: '#64748b', marginTop: '2px' }}>
+                  {selectedNode.data.category}
+                </span>
+              )}
+            </h3>
+            {describeNode(selectedNode.data?.nodeType) && (
+              <p style={{ fontSize: '13px', color: '#334155', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '10px 12px', margin: '0 0 12px 0' }}>
+                {describeNode(selectedNode.data?.nodeType)}
+              </p>
+            )}
+            <pre style={{ background: '#f1f5f9', padding: '12px', borderRadius: '6px', fontSize: '12px', overflowX: 'auto' }}>
+              {JSON.stringify(selectedNode.data?.details || selectedNode.data?.raw, null, 2)}
+            </pre>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

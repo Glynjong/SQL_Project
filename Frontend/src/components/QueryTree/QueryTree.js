@@ -14,7 +14,6 @@ const nodeTypes = { planNode: PlanNode };
 export const QueryTree = ({
   query,
   onQueryChange,
-  onExplain,
   onAnalyze,
   planNodes,
   planEdges,
@@ -57,6 +56,8 @@ export const QueryTree = ({
   onFetchProvStatus,
   onEnableProvenance,
   onLookupToken,
+  tableResponsibility,
+  responsibilityLoading,
   onFetchProvenance,
   onFetchCircuit,
 }) => {
@@ -81,7 +82,6 @@ export const QueryTree = ({
       <TreeToolbar
         query={query}
         onQueryChange={onQueryChange}
-        onExplain={onExplain}
         onAnalyze={onAnalyze}
         isLoading={planLoading}
       />
@@ -205,6 +205,8 @@ export const QueryTree = ({
             statusLoading={statusLoading}
             onEnableProvenance={onEnableProvenance}
             onLookupToken={onLookupToken}
+            tableResponsibility={tableResponsibility}
+            responsibilityLoading={responsibilityLoading}
             onRerun={() => onFetchProvenance(query)}
           />
         </div>
