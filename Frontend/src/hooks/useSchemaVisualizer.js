@@ -99,6 +99,43 @@ export const useSchemaVisualizer = () => {
     return { success: true, sql };
   };
 
+  // After a structure edit (see EditTableModal): rebuild the tables that are
+  // already on the canvas from fresh metadata, keeping their positions.
+  // renameMap = { oldName: newName }; droppedTable = a table that no longer exists.
+  const refreshCanvasTables = async (renameMap = {}, droppedTable = null) => {
+    const fresh = await loadSchemaMetadata();
+    const finalName = (id) => renameMap[id] || id;
+
+    setNodes((nds) =>
+      nds
+        .filter((n) => n.id !== droppedTable)
+        .map((n) => {
+          const name = finalName(n.id);
+          return fresh[name] ? { ...createDatabaseNode(name, fresh[name]), position: n.position } : null;
+        })
+        .filter(Boolean)
+    );
+
+    const names = new Set(
+      nodes.filter((n) => n.id !== droppedTable).map((n) => finalName(n.id)).filter((t) => fresh[t])
+    );
+    try {
+      const fkRows = await fetchForeignKeys();
+      const fkEdges = createForeignKeyEdges(fkRows, names);
+      setEdges((eds) => {
+        // FK edges are re-derived from the database; manual edges are kept
+        // (following any rename) unless one of their tables is gone.
+        const manual = eds
+          .filter((e) => !String(e.id).startsWith('fk-'))
+          .map((e) => ({ ...e, source: finalName(e.source), target: finalName(e.target) }))
+          .filter((e) => names.has(e.source) && names.has(e.target));
+        return [...manual, ...fkEdges];
+      });
+    } catch (err) {
+      console.error('Failed to refresh FK edges:', err);
+    }
+  };
+
   const addAllTablesToCanvas = async () => {
     // Self-healing: if metadata was never loaded (or the one-time mount
     // fetch failed — e.g. hit before the backend was ready), retry here
@@ -173,6 +210,7 @@ export const useSchemaVisualizer = () => {
     addTableToCanvas,
     addAllTablesToCanvas,
     createTable,
+    refreshCanvasTables,
     clearCanvas,
   };
 };

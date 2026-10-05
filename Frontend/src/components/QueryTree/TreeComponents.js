@@ -85,7 +85,7 @@ export const TreeToolbar = ({ query, onQueryChange, onAnalyze, isLoading }) => {
       </div>
       <div style={{ display: 'flex', gap: '8px' }}>
         <button className="btn-success" onClick={handleClick} disabled={isLoading} style={{ background: 'var(--orange)' }}>
-          {isLoading ? 'Running…' : '⚙️ Explain'}
+          {isLoading ? 'Running…' : '⚙️ Explain Analyze'}
         </button>
       </div>
     </div>

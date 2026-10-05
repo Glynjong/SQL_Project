@@ -10,7 +10,7 @@ COPY package*.json ./
 RUN npm install
 
 # Copy application files
-COPY server.js ./
+COPY server.js provsqlSort.js ./
 
 # Expose port 5000
 EXPOSE 5000

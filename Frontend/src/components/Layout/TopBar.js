@@ -7,6 +7,12 @@ export const TopBar = ({ activeTab, onTabChange }) => (
       SQL <span>Visual</span> Debugger
     </span>
     <button
+      className={`tab-btn ${activeTab === 'home' ? 'active' : ''}`}
+      onClick={() => onTabChange('home')}
+    >
+      🏠 Home
+    </button>
+    <button
       className={`tab-btn ${activeTab === 'runner' ? 'active' : ''}`}
       onClick={() => onTabChange('runner')}
     >

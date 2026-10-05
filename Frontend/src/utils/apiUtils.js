@@ -33,7 +33,7 @@ export const explainAnalyzeQuery = async (sql) => {
 
 export const fetchSchemaMetadata = async () => {
   const sql = `
-    SELECT cols.table_name, cols.column_name, cols.data_type, cons.constraint_type
+    SELECT cols.table_name, cols.column_name, cols.data_type, cols.is_nullable, cons.constraint_type
     FROM information_schema.columns cols
     LEFT JOIN information_schema.key_column_usage kcu
       ON cols.table_name = kcu.table_name AND cols.column_name = kcu.column_name
@@ -54,6 +54,7 @@ export const fetchSchemaMetadata = async () => {
       name: row.column_name,
       type: row.data_type,
       constraint: row.constraint_type,
+      nullable: row.is_nullable === 'YES',
     });
     return acc;
   }, {});

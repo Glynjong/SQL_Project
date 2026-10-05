@@ -13,7 +13,9 @@ export const AppLayout = ({
   <div className="app-shell">
     <TopBar activeTab={activeTab} onTabChange={onTabChange} />
     <div className="body-layout">
-      <Sidebar tables={tables} activeTab={activeTab} onTableClick={onTableClick} />
+      {activeTab !== 'home' && (
+        <Sidebar tables={tables} activeTab={activeTab} onTableClick={onTableClick} />
+      )}
       <div className="content-area">{children}</div>
     </div>
   </div>

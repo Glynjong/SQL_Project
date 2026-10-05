@@ -376,6 +376,66 @@ body { background: var(--bg); color: var(--text); }
   gap: 8px;
 }
 
+/* Schema Visualizer toolbar: every control the same height, font and padding.
+   Scoped to .toolbar-buttons so buttons elsewhere (Query Runner etc.) keep
+   their own sizing. Colour still carries meaning: blue = action, red = destructive. */
+.toolbar-buttons {
+  align-items: center;
+}
+.toolbar-buttons .btn-primary,
+.toolbar-buttons .btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 34px;
+  padding: 0 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  border-radius: var(--radius);
+}
+.toolbar-buttons .btn-danger {
+  border: 1px solid var(--border);
+}
+
+.toolbar-menu {
+  position: relative;
+}
+.toolbar-menu-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 100%;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  padding: 4px;
+  z-index: 20;
+}
+.toolbar-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-family: 'IBM Plex Mono', 'IBM Plex Sans', monospace;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.toolbar-menu-item:hover {
+  background: var(--surface-2);
+  color: var(--blue-dark);
+}
+
 /* ─── ReactFlow shared canvas ─────────────────────────────────────────────── */
 .react-flow-canvas { background: var(--bg); flex: 1; }
 

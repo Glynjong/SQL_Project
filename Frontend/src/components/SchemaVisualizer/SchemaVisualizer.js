@@ -1,10 +1,56 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import ReactFlow, { Background, Controls } from 'reactflow';
 import 'reactflow/dist/style.css';
 import '../../App.css';
 import { COLUMN_TYPES } from '../../utils/schemaUtils';
+import { EditTableModal } from './EditTableModal';
 
-export const VisualizerToolbar = ({ onClearCanvas, onLoadAllTables, onOpenAddTable }) => (
+// "Edit table" as a normal toolbar button that opens a menu of tables — a
+// native <select> can't be styled to match the other buttons.
+const EditTableMenu = ({ tables, onEditTable }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="toolbar-menu" ref={ref}>
+      <button
+        className="btn-primary"
+        onClick={() => setOpen((o) => !o)}
+        disabled={tables.length === 0}
+        title={tables.length === 0 ? 'No tables loaded yet' : "Edit a table's structure or rows"}
+      >
+        ✏️ Edit Table ▾
+      </button>
+      {open && (
+        <div className="toolbar-menu-list">
+          {tables.map((t) => (
+            <button
+              key={t}
+              className="toolbar-menu-item"
+              onClick={() => { setOpen(false); onEditTable(t); }}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const VisualizerToolbar = ({ onClearCanvas, onLoadAllTables, onOpenAddTable, tables = [], onEditTable }) => (
   <div className="visualizer-toolbar">
     <div className="visualizer-legend">
       <span>
@@ -15,9 +61,10 @@ export const VisualizerToolbar = ({ onClearCanvas, onLoadAllTables, onOpenAddTab
         <span className="legend-circle legend-circle--blue" />
         Manual connection
       </span>
-      <span className="visualizer-legend-hint">Drag handle to connect</span>
+      <span className="visualizer-legend-hint">Drag handle to connect · Double-click a table to edit</span>
     </div>
     <div className="toolbar-buttons">
+      <EditTableMenu tables={tables} onEditTable={onEditTable} />
       <button className="btn-primary" onClick={onOpenAddTable}>
         + Add Table
       </button>
@@ -166,17 +213,43 @@ export const SchemaVisualizer = ({
   onClearCanvas,
   onLoadAllTables,
   onCreateTable,
+  schemaData = {},
+  onSchemaChanged,
+  onCloseTablePopup,
   isLoading,
   error,
 }) => {
   const [addTableOpen, setAddTableOpen] = useState(false);
+  const [editTable, setEditTable] = useState(null);
+
+  // Opening the editor closes the read-only data popup that a single click opens.
+  const startEdit = (tableName) => {
+    if (onCloseTablePopup) onCloseTablePopup();
+    setEditTable(tableName);
+  };
 
   return (
     <div className="visualizer-wrap">
-      <VisualizerToolbar onClearCanvas={onClearCanvas} onLoadAllTables={onLoadAllTables} onOpenAddTable={() => setAddTableOpen(true)} />
+      <VisualizerToolbar
+        onClearCanvas={onClearCanvas}
+        onLoadAllTables={onLoadAllTables}
+        onOpenAddTable={() => setAddTableOpen(true)}
+        tables={Object.keys(schemaData)}
+        onEditTable={startEdit}
+      />
 
       {addTableOpen && (
         <AddTableModal onClose={() => setAddTableOpen(false)} onCreateTable={onCreateTable} />
+      )}
+
+      {editTable && (
+        <EditTableModal
+          key={editTable}
+          tableName={editTable}
+          schemaData={schemaData}
+          onClose={() => setEditTable(null)}
+          onSchemaChanged={onSchemaChanged}
+        />
       )}
 
       {error && (
@@ -223,6 +296,7 @@ export const SchemaVisualizer = ({
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
+        onNodeDoubleClick={(evt, node) => startEdit(node.id)}
         fitView
         className="react-flow-canvas"
       >

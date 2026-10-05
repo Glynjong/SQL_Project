@@ -40,6 +40,7 @@ export const QueryTree = ({
   astLoading,
   astError,
   onParseAST,
+  astControls,
   // ProvSQL Provenance tab
   provRows,
   provFields,
@@ -56,7 +57,8 @@ export const QueryTree = ({
   onFetchProvStatus,
   onEnableProvenance,
   onLookupToken,
-  tableResponsibility,
+  tupleResponsibility,
+  provNotes,
   responsibilityLoading,
   onFetchProvenance,
   onFetchCircuit,
@@ -65,7 +67,7 @@ export const QueryTree = ({
 
   const handleTabChange = (nextTab) => {
     setSubTab(nextTab);
-    if (nextTab === 'logical' && astNodes.length === 0 && !astLoading) {
+    if (nextTab === 'logical' && !astLoading && (astNodes.length === 0 || (astControls && astControls.lastParsedSql !== query))) {
       onParseAST(query);
     } else if (nextTab === 'provsql') {
       if (provStatus.installed === null && !statusLoading) {
@@ -181,6 +183,8 @@ export const QueryTree = ({
               onNodeClick={onAstNodeClick}
               isLoading={astLoading}
               error={astError}
+              controls={astControls}
+              onReparse={() => onParseAST(query)}
             />
           )}
         </div>
@@ -205,7 +209,8 @@ export const QueryTree = ({
             statusLoading={statusLoading}
             onEnableProvenance={onEnableProvenance}
             onLookupToken={onLookupToken}
-            tableResponsibility={tableResponsibility}
+            tupleResponsibility={tupleResponsibility}
+            provNotes={provNotes}
             responsibilityLoading={responsibilityLoading}
             onRerun={() => onFetchProvenance(query)}
           />

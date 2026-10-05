@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from './components/Layout';
 import { QueryRunner } from './components/QueryRunner/QueryRunner';
+import { HomePage } from './components/Home/HomePage';
 import { SchemaVisualizer } from './components/SchemaVisualizer/SchemaVisualizer';
 import { QueryTree } from './components/QueryTree/QueryTree';
 import { TableDataPopup } from './components/Common/TableDataPopup';
@@ -15,7 +16,7 @@ import './App.css';
 
 function App() {
   // State management
-  const { activeTab, setActiveTab } = useTabs('runner');
+  const { activeTab, setActiveTab } = useTabs('home');
   const queryRunner = useQueryRunner();
   const schemaVisualizer = useSchemaVisualizer();
   const queryTree = useQueryTree();
@@ -121,6 +122,20 @@ function App() {
   // Render active tab content
   const renderTabContent = () => {
     switch (activeTab) {
+      case 'home':
+        return (
+          <HomePage
+            onOpenInAnalyzer={(sql) => {
+              queryRunner.setQuery(sql);
+              setActiveTab('querytree');
+            }}
+            onOpenInRunner={(sql) => {
+              queryRunner.setQuery(sql);
+              setActiveTab('runner');
+            }}
+          />
+        );
+
       case 'runner':
         return (
           <QueryRunner
@@ -150,6 +165,9 @@ function App() {
             onClearCanvas={schemaVisualizer.clearCanvas}
             onLoadAllTables={schemaVisualizer.addAllTablesToCanvas}
             onCreateTable={schemaVisualizer.createTable}
+            schemaData={schemaVisualizer.schemaData}
+            onSchemaChanged={schemaVisualizer.refreshCanvasTables}
+            onCloseTablePopup={() => setPopup({ tableName: null, data: [], isLoading: false, error: null })}
             isLoading={schemaVisualizer.isLoading}
             error={schemaVisualizer.error}
           />
@@ -186,6 +204,7 @@ function App() {
             astLoading={logicalTree.astLoading}
             astError={logicalTree.astError}
             onParseAST={logicalTree.fetchAndParseAST}
+            astControls={logicalTree.controls}
             // ProvSQL Provenance tab
             provRows={provSQL.provRows}
             provFields={provSQL.provFields}
@@ -202,7 +221,8 @@ function App() {
             onFetchProvStatus={provSQL.fetchStatus}
             onEnableProvenance={provSQL.enableProvenance}
             onLookupToken={provSQL.lookupToken}
-            tableResponsibility={provSQL.tableResponsibility}
+            tupleResponsibility={provSQL.tupleResponsibility}
+            provNotes={provSQL.provNotes}
             responsibilityLoading={provSQL.responsibilityLoading}
             onFetchProvenance={provSQL.fetchProvenance}
             onFetchCircuit={provSQL.fetchCircuit}

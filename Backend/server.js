@@ -1,6 +1,7 @@
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
+const { planClientSort, applyClientSort } = require('./provsqlSort');
 
 let pgsqlParser;
 try {
@@ -28,11 +29,158 @@ const pool = new Pool({
   port: process.env.DB_PORT || 5432,
 });
 
+// ── ProvSQL isolation ─────────────────────────────────────────────────────
+// ProvSQL installs a planner hook that runs on EVERY query in this database
+// and rewrites anything touching a provenance-enabled table — rejecting SQL
+// it doesn't support (e.g. ORDER BY on an aggregate result). Only the
+// ProvSQL tab wants that. Every other feature (Query Runner, Explain, schema
+// editing) runs with the hook switched off for the duration of its query, so
+// ProvSQL's limitations can't leak into them. Note: with provsql.active = off
+// this project's ProvSQL 1.5.0 build still rejected WITH RECURSIVE ("Recursive
+// CTEs not supported"), so recursive queries additionally get the temp-table
+// treatment in queryShadowed() below. (ProvSQL 1.7+ supports recursion natively, but has
+// a planner-hook crash with the switch off, fixed in 1.8.0 — if you upgrade to
+// 1.7.x, set PROVSQL_KEEP_ON_FOR_RECURSIVE=1 to leave the hook on for them.)
+const keepProvSQLOn = (sql) =>
+  process.env.PROVSQL_KEEP_ON_FOR_RECURSIVE === '1' && /\bWITH\s+RECURSIVE\b/i.test(sql);
+
+// ── Recursive queries over provenance-tracked tables ──────────────────────
+// ProvSQL 1.5.0 rejects WITH RECURSIVE ("Recursive CTEs not supported") when
+// the query reads a provenance-tracked table, and in practice (observed on this
+// project's build) the provsql.active switch did not get it to skip that check. What does work is
+// not triggering ProvSQL at all: its planner hook only fires for queries that
+// touch a table with a `provsql` column. So, for a read-only recursive query,
+// we copy the tracked tables the query mentions into TEMP tables WITHOUT that
+// column (same names, so they shadow the real ones), run the query against
+// the copies, and always ROLLBACK — the real tables are never modified.
+const MAX_SHADOW_ROWS = 200000; // reltuples estimate; larger tables are not copied
+const isRecursiveSql = (sql) => /\bWITH\s+RECURSIVE\b/i.test(sql);
+const quoteIdent = (s) => `"${String(s).replace(/"/g, '""')}"`;
+const mentionsName = (sql, name) =>
+  new RegExp(`(^|[^A-Za-z0-9_$])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^A-Za-z0-9_$]|$)`, 'i').test(sql);
+
+const TRACKED_TABLES_SQL = `
+  SELECT n.nspname, c.relname, c.reltuples::bigint AS est_rows,
+         (SELECT array_agg(a2.attname::text ORDER BY a2.attnum)
+            FROM pg_attribute a2
+           WHERE a2.attrelid = c.oid AND a2.attnum > 0 AND NOT a2.attisdropped
+             AND a2.attname <> 'provsql') AS cols
+    FROM pg_attribute a
+    JOIN pg_class c ON c.oid = a.attrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+   WHERE a.attname = 'provsql' AND NOT a.attisdropped AND a.atttypid = 'uuid'::regtype
+     AND c.relkind IN ('r', 'p')
+     AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'provsql')
+     AND n.nspname !~ '^pg_'
+   ORDER BY n.nspname, c.relname`;
+
+// True only for plain SELECTs (or EXPLAIN of a SELECT) — never anything that writes.
+function onlyReadsData(parsed) {
+  let list = parsed;
+  if (list && !Array.isArray(list) && Array.isArray(list.stmts)) list = list.stmts;
+  if (!Array.isArray(list) || list.length === 0) return false;
+  return list.every((item) => {
+    let s = item;
+    if (s && s.RawStmt) s = s.RawStmt;
+    if (s && s.stmt) s = s.stmt;
+    if (!s || typeof s !== 'object') return false;
+    const tag = Object.keys(s)[0];
+    if (tag === 'SelectStmt') return true;
+    if (tag === 'ExplainStmt') {
+      const q = s.ExplainStmt && s.ExplainStmt.query;
+      return !!q && Object.keys(q)[0] === 'SelectStmt';
+    }
+    return false;
+  });
+}
+
+// Returns the query result, or null when this approach doesn't apply (not a
+// recursive read-only query, or it mentions no provenance-tracked table) so
+// the caller carries on with the normal path.
+async function queryShadowed(sql) {
+  if (!isRecursiveSql(sql) || keepProvSQLOn(sql)) return null;
+  let parsed = null;
+  try {
+    if (pgsqlParser && pgsqlParser.parse) parsed = await pgsqlParser.parse(sql);
+  } catch (e) {
+    return null; // invalid SQL — let the normal path report Postgres's own error
+  }
+  if (!onlyReadsData(parsed)) return null;
+
+  const client = await pool.connect();
+  let broken = false;
+  try {
+    await client.query('BEGIN');
+    const tracked = (await client.query(TRACKED_TABLES_SQL)).rows
+      .filter((t) => mentionsName(sql, t.relname) && t.cols && t.cols.length && Number(t.est_rows) <= MAX_SHADOW_ROWS);
+    if (tracked.length === 0) return null;
+
+    // belt and braces: also switch the hook off while copying, so the copy
+    // can't pick up a provenance column
+    const guc = await client.query("SELECT current_setting('provsql.active', true) AS v");
+    if (guc.rows[0].v !== null) await client.query('SET LOCAL provsql.active = off');
+
+    const done = new Set();
+    for (const t of tracked) {
+      if (done.has(t.relname)) continue; // same name in two schemas: first one wins, like search_path
+      done.add(t.relname);
+      // eslint-disable-next-line no-await-in-loop
+      await client.query(
+        `CREATE TEMP TABLE ${quoteIdent(t.relname)} ON COMMIT DROP AS SELECT ${t.cols.map(quoteIdent).join(', ')} FROM ${quoteIdent(t.nspname)}.${quoteIdent(t.relname)}`
+      );
+      // eslint-disable-next-line no-await-in-loop
+      await client.query(`ALTER TABLE pg_temp.${quoteIdent(t.relname)} DROP COLUMN IF EXISTS provsql`);
+    }
+    await client.query("SELECT set_config('search_path', 'pg_temp, ' || current_setting('search_path'), true)");
+    await client.query('SET TRANSACTION READ ONLY'); // writing to temp tables is still allowed, nothing else is
+    return await client.query(sql);
+  } finally {
+    try { await client.query('ROLLBACK'); } catch (e) { broken = true; }
+    client.release(broken);
+  }
+}
+
+async function queryIsolated(sql) {
+  const shadowed = await queryShadowed(sql);
+  if (shadowed) return shadowed;
+  const client = await pool.connect();
+  let resetFailed = false;
+  try {
+    if (!keepProvSQLOn(sql)) {
+      try {
+        await client.query('SET provsql.active = off');
+      } catch (e) {
+        /* ProvSQL not available on this connection — nothing to switch off */
+      }
+    }
+    return await client.query(sql);
+  } finally {
+    // pooled connections are reused, so never leave the setting behind
+    try { await client.query('RESET provsql.active'); } catch (e) { resetFailed = true; }
+    client.release(resetFailed);
+  }
+}
+
+// Same, but inside a read-only transaction that is always rolled back. Used
+// for the "show plain results" fallback so it can never modify data.
+async function queryReadOnlyIsolated(sql) {
+  const client = await pool.connect();
+  let broken = false;
+  try {
+    await client.query('BEGIN READ ONLY');
+    if (!keepProvSQLOn(sql)) await client.query('SET LOCAL provsql.active = off');
+    return await client.query(sql);
+  } finally {
+    try { await client.query('ROLLBACK'); } catch (e) { broken = true; }
+    client.release(broken);
+  }
+}
+
 app.post('/run-query', async (req, res) => {
   const { sql } = req.body;
   console.log('Executing query:', sql);
   try {
-    const result = await pool.query(sql);
+    const result = await queryIsolated(sql);
     console.log('Query result:', { rows: result.rows.length, command: result.command, rowCount: result.rowCount });
     
     // Check if this was a SELECT (has rows) or a CREATE/INSERT (has rowCount/command)
@@ -51,7 +199,7 @@ app.post('/run-query', async (req, res) => {
 app.post('/explain-query', async (req, res) => {
   const { sql } = req.body;
   try {
-    const result = await pool.query(`EXPLAIN (FORMAT JSON) ${sql}`);
+    const result = await queryIsolated(`EXPLAIN (FORMAT JSON) ${sql}`);
     res.json({ success: true, plan: result.rows[0]['QUERY PLAN'][0] });
   } catch (err) {
     console.error(err);
@@ -62,7 +210,7 @@ app.post('/explain-query', async (req, res) => {
 app.post('/explain-analyze-query', async (req, res) => {
   const { sql } = req.body;
   try {
-    const result = await pool.query(`EXPLAIN (ANALYZE, BUFFERS, TIMING, VERBOSE, FORMAT JSON) ${sql}`);
+    const result = await queryIsolated(`EXPLAIN (ANALYZE, BUFFERS, TIMING, VERBOSE, FORMAT JSON) ${sql}`);
     res.json({ success: true, plan: result.rows[0]['QUERY PLAN'][0] });
   } catch (err) {
     console.error(err);
@@ -218,18 +366,65 @@ app.post('/provsql/provenance', async (req, res) => {
     if (!(await requireProvSQL(res))) return;
 
     const trimmed = sql.trim().replace(/;\s*$/, '');
-    const alreadyAsksForProvenance = /provenance\s*\(\s*\)/i.test(trimmed);
+    const asksForProvenance = /provenance\s*\(\s*\)/i.test(trimmed);
+    const wrap = (q) => (asksForProvenance ? q : `SELECT sub.*, provenance() AS provenance_token FROM (${q}) AS sub`);
+    const fieldNamesOf = (r) => (r.fields ? r.fields.map((f) => f.name) : []);
 
-    const wrapped = alreadyAsksForProvenance
-      ? trimmed
-      : `SELECT sub.*, provenance() AS provenance_token FROM (${trimmed}) AS sub`;
+    // 1. The normal path.
+    let firstError;
+    try {
+      const result = await pool.query(wrap(trimmed));
+      return res.json({ success: true, rows: result.rows || [], fields: fieldNamesOf(result), notes: [] });
+    } catch (err) {
+      firstError = err;
+    }
+    console.warn('ProvSQL rejected the query — trying fallbacks:', firstError.message);
 
-    const result = await pool.query(wrapped);
-    res.json({
-      success: true,
-      rows: result.rows || [],
-      fields: result.fields ? result.fields.map((f) => f.name) : []
-    });
+    // 2. ORDER BY / LIMIT that ProvSQL can't handle: run without them and
+    //    apply them to the returned rows. Sorting doesn't change which rows
+    //    exist or their provenance tokens, so the circuits stay valid.
+    try {
+      if (pgsqlParser && pgsqlParser.parse) {
+        const plan = planClientSort(trimmed, await pgsqlParser.parse(trimmed));
+        if (plan) {
+          const result = await pool.query(wrap(plan.base));
+          const fields = fieldNamesOf(result);
+          const sorted = applyClientSort(plan, result.rows || [], fields);
+          if (sorted) {
+            return res.json({
+              success: true,
+              rows: sorted,
+              fields,
+              notes: [
+                `ProvSQL doesn't support this ORDER BY, so the rows were sorted${plan.limit !== null || plan.offset ? ' (and LIMIT/OFFSET applied)' : ''} after the query ran. Provenance tokens are unchanged.`,
+              ],
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Client-side ORDER BY fallback failed:', err.message);
+    }
+
+    // 3. Any other ProvSQL conflict: still show the data, without provenance.
+    //    Read-only + rolled back, so this can never change anything.
+    try {
+      const plainRaw = (await queryShadowed(trimmed)) || (await queryReadOnlyIsolated(trimmed));
+      const plain = Array.isArray(plainRaw) ? plainRaw[plainRaw.length - 1] : plainRaw;
+      return res.json({
+        success: true,
+        rows: plain.rows || [],
+        fields: fieldNamesOf(plain),
+        provenanceUnavailable: true,
+        notes: [
+          `ProvSQL couldn't track provenance for this query (${firstError.message}), so these are plain results without provenance tokens — rows can't be opened as circuits.`,
+        ],
+      });
+    } catch (err) {
+      /* genuinely invalid SQL, or not a read-only query — report the original error below */
+    }
+
+    throw firstError;
   } catch (err) {
     console.error('ProvSQL Error:', err.message);
     res.status(400).json({
@@ -297,4 +492,8 @@ app.post('/provsql/circuit', async (req, res) => {
   }
 });
 
-app.listen(5000, () => console.log('Server running on port 5000'));
+app.listen(5000, () => {
+  console.log('Server running on port 5000');
+  // If you can't see this line in `docker compose logs backend`, the backend is running old code.
+  console.log('ProvSQL isolation: ON — recursive queries use plain temp copies of tracked tables (build 2026-10-06b)');
+});

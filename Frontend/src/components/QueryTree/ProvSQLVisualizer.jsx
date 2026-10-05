@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import ReactFlow, { Background, Controls } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { buildPieSlices, arcPath, groupByTable } from '../../utils/shapley';
 
 function findToken(row) {
   // The backend appends this column when the query doesn't already ask
@@ -12,41 +13,164 @@ function findToken(row) {
   return match || null;
 }
 
-const BAR_COLORS = ['#4f46e5', '#d97706', '#059669', '#dc2626', '#7c3aed', '#0891b2'];
+// One hue per table; tuples of the same table are shades of that hue, so a
+// slice can be matched to its table at a glance.
+const TABLE_HUES = [243, 28, 152, 0, 268, 190, 330, 84, 14, 205];
+const OTHER_COLOR = '#94a3b8';
+const tableColor = (hue, shade = 0) => `hsl(${hue}, 62%, ${Math.min(40 + shade * 7, 70)}%)`;
 
-function ResponsibilityChart({ data, loading }) {
+const toggleBtn = (active, side) => ({
+  padding: '3px 10px',
+  fontSize: '11px',
+  fontWeight: 600,
+  cursor: 'pointer',
+  border: `1px solid ${active ? '#4f46e5' : '#cbd5e1'}`,
+  background: active ? '#4f46e5' : '#ffffff',
+  color: active ? '#ffffff' : '#475569',
+  borderRadius: side === 'left' ? '6px 0 0 6px' : '0 6px 6px 0',
+  marginLeft: side === 'right' ? '-1px' : 0,
+});
+
+// Pie chart of responsibility for the selected result row, with a toggle:
+//   By tuple — one slice per source row. Every occurrence of a tuple in the
+//              circuit counts, so a tuple that feeds the result twice (e.g.
+//              through a self-join) gets a bigger slice. The legend is
+//              grouped under each tuple's parent table, with a subtotal.
+//   By table — one slice per table (the sum of its tuples' shares).
+function PieChart({ data, loading }) {
+  const [mode, setMode] = useState('tuple');
+  const [hoverKey, setHoverKey] = useState(null); // a tuple id, 'tbl:<table>', or null
+
   if (loading) {
-    return <div style={{ fontSize: '12px', color: '#64748b', padding: '10px 16px' }}>Computing table responsibility…</div>;
+    return <div style={{ fontSize: '12px', color: '#64748b', padding: '14px 20px' }}>Computing tuple responsibility…</div>;
   }
   if (!data || data.length === 0) return null;
 
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const groups = groupByTable(data);
+  const hueOf = new Map(groups.map((g, i) => [g.table, TABLE_HUES[i % TABLE_HUES.length]]));
+  const shadeOf = new Map();
+  groups.forEach((g) => g.tuples.forEach((t, i) => shadeOf.set(t.id, i)));
+
+  const tableEntries = groups.map((g) => ({
+    id: `tbl:${g.table}`,
+    table: g.table,
+    detail: plural(g.tuples.length, 'tuple'),
+    share: g.share,
+    occurrences: g.occurrences,
+  }));
+  // tuple slices follow the grouped legend order, so each table's slices sit side by side
+  const slices = mode === 'table'
+    ? buildPieSlices(tableEntries, 10)
+    : buildPieSlices(groups.flatMap((g) => g.tuples), 24, { keepOrder: true });
+
+  const colorOf = (s) => {
+    if (s.id === '__other') return OTHER_COLOR;
+    return tableColor(hueOf.get(s.table), mode === 'table' ? 0 : shadeOf.get(s.id));
+  };
+  const shownIds = new Set(slices.map((s) => s.id));
+  const isActive = (s) => {
+    if (hoverKey === null) return true;
+    if (hoverKey === s.id || hoverKey === `tbl:${s.table}`) return true;
+    // a tuple folded into "Other" highlights the Other slice
+    return s.id === '__other' && !hoverKey.startsWith('tbl:') && !shownIds.has(hoverKey);
+  };
+
+  const size = 180;
+  const c = size / 2;
+  const r = 78;
+  const totalOccurrences = data.reduce((s, e) => s + e.occurrences, 0);
+  const pct = (x) => `${(x * 100).toFixed(1)}%`;
+  const swatch = (color, small) => (
+    <span style={{ width: small ? '8px' : '10px', height: small ? '8px' : '10px', borderRadius: '2px', marginTop: '3px', flexShrink: 0, background: color }} />
+  );
+
   return (
-    <div style={{ padding: '10px 20px', borderBottom: '1px solid #e2e8f0', background: '#fafafa' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '8px' }}>
-        <span style={{ fontSize: '12px', fontWeight: 700, color: '#1e293b' }}>Table Responsibility</span>
-        <span style={{ fontSize: '10px', color: '#94a3b8' }}>
-          approximate Shapley value — equal-split over AND/OR gates
-        </span>
+    <div style={{ padding: '16px 20px', background: '#fafafa' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+        <div style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b' }}>Responsibility</div>
+        <div style={{ display: 'flex' }}>
+          <button style={toggleBtn(mode === 'tuple', 'left')} onClick={() => setMode('tuple')}>By tuple</button>
+          <button style={toggleBtn(mode === 'table', 'right')} onClick={() => setMode('table')}>By table</button>
+        </div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-        {data.map(({ table, share }, idx) => (
-          <div key={table} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ width: '90px', fontSize: '11px', color: '#334155', flexShrink: 0, textAlign: 'right' }}>{table}</span>
-            <div style={{ flex: 1, background: '#e2e8f0', borderRadius: '4px', height: '14px', overflow: 'hidden' }}>
-              <div
-                style={{
-                  width: `${Math.max(share * 100, 1.5)}%`,
-                  height: '100%',
-                  background: BAR_COLORS[idx % BAR_COLORS.length],
-                  transition: 'width 0.3s ease',
-                }}
-              />
+      <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+        usage-weighted Shapley approximation — every occurrence of a tuple in the circuit counts
+      </div>
+
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block', margin: '12px auto' }}>
+        {slices.map((s) => {
+          const path = arcPath(c, c, r, s.startAngle, s.endAngle);
+          const common = {
+            fill: colorOf(s),
+            stroke: '#ffffff',
+            strokeWidth: 2,
+            opacity: isActive(s) ? 1 : 0.35,
+            onMouseEnter: () => setHoverKey(s.id),
+            onMouseLeave: () => setHoverKey(null),
+          };
+          const tip = `${s.table}${s.detail ? ` (${s.detail})` : ''}: ${pct(s.frac)}`;
+          return path
+            ? <path key={s.id} d={path} {...common}><title>{tip}</title></path>
+            : <circle key={s.id} cx={c} cy={c} r={r} {...common}><title>{tip}</title></circle>;
+        })}
+      </svg>
+
+      <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
+        {mode === 'table' ? (
+          groups.map((g) => (
+            <div
+              key={g.table}
+              onMouseEnter={() => setHoverKey(`tbl:${g.table}`)}
+              onMouseLeave={() => setHoverKey(null)}
+              style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '3px 4px', borderRadius: '4px', background: hoverKey === `tbl:${g.table}` ? '#eef2ff' : 'transparent' }}
+            >
+              {swatch(tableColor(hueOf.get(g.table), 0))}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: '#1e293b' }}>{g.table}</div>
+                <div style={{ fontSize: '11px', color: '#64748b' }}>
+                  {plural(g.tuples.length, 'tuple')} · {plural(g.occurrences, 'occurrence')}
+                </div>
+              </div>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155', flexShrink: 0 }}>{pct(g.share)}</span>
             </div>
-            <span style={{ width: '44px', fontSize: '11px', color: '#475569', flexShrink: 0 }}>
-              {(share * 100).toFixed(1)}%
-            </span>
-          </div>
-        ))}
+          ))
+        ) : (
+          groups.map((g) => (
+            <div key={g.table} style={{ marginBottom: '6px' }}>
+              <div
+                onMouseEnter={() => setHoverKey(`tbl:${g.table}`)}
+                onMouseLeave={() => setHoverKey(null)}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 4px', borderBottom: '1px solid #e2e8f0', background: hoverKey === `tbl:${g.table}` ? '#eef2ff' : 'transparent' }}
+              >
+                <span style={{ width: '10px', height: '10px', borderRadius: '2px', flexShrink: 0, background: tableColor(hueOf.get(g.table), 0) }} />
+                <span style={{ flex: 1, fontSize: '12px', fontWeight: 700, color: '#1e293b' }}>
+                  {g.table}
+                  <span style={{ fontWeight: 400, color: '#94a3b8' }}> · {plural(g.tuples.length, 'tuple')}</span>
+                </span>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#334155' }}>{pct(g.share)}</span>
+              </div>
+              {g.tuples.map((t) => (
+                <div
+                  key={t.id}
+                  onMouseEnter={() => setHoverKey(t.id)}
+                  onMouseLeave={() => setHoverKey(null)}
+                  style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '2px 4px 2px 18px', borderRadius: '4px', background: hoverKey === t.id ? '#eef2ff' : 'transparent' }}
+                >
+                  {swatch(tableColor(hueOf.get(g.table), shadeOf.get(t.id)), true)}
+                  <div style={{ flex: 1, minWidth: 0, fontSize: '11px', color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={t.detail}>
+                    {t.detail || '—'}
+                    {t.occurrences > 1 && <span style={{ color: '#7c3aed' }}> ×{t.occurrences}</span>}
+                  </div>
+                  <span style={{ fontSize: '11px', color: '#334155', flexShrink: 0 }}>{pct(t.share)}</span>
+                </div>
+              ))}
+            </div>
+          ))
+        )}
+      </div>
+      <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '6px' }}>
+        {plural(data.length, 'tuple')} from {plural(groups.length, 'table')} · {plural(totalOccurrences, 'occurrence')}
       </div>
     </div>
   );
@@ -144,8 +268,9 @@ export function ProvSQLVisualizer({
   onEnableProvenance,
   onRerun,
   onLookupToken,
-  tableResponsibility,
+  tupleResponsibility,
   responsibilityLoading,
+  provNotes = [],
 }) {
   const [circuitModalOpen, setCircuitModalOpen] = useState(false);
   const [selectedCircuitNode, setSelectedCircuitNode] = useState(null);
@@ -183,6 +308,14 @@ export function ProvSQLVisualizer({
       {error && (
         <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#991b1b', padding: '12px', borderRadius: '6px' }}>
           {error}
+        </div>
+      )}
+
+      {provNotes.length > 0 && (
+        <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', color: '#92400e', padding: '10px 14px', borderRadius: '6px', fontSize: '12px' }}>
+          {provNotes.map((n, i) => (
+            <div key={i}>ℹ️ {n}</div>
+          ))}
         </div>
       )}
 
@@ -303,8 +436,6 @@ export function ProvSQLVisualizer({
               </button>
             </div>
 
-            <ResponsibilityChart data={tableResponsibility} loading={responsibilityLoading} />
-
             <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
               <div style={{ flex: 1, position: 'relative', background: '#f8fafc' }}>
                 {circuitLoading && (
@@ -330,9 +461,12 @@ export function ProvSQLVisualizer({
                 </ReactFlow>
               </div>
 
-              {/* Node inspector — a side panel inside the modal, not a second popup */}
-              {selectedCircuitNode && (
-                <div style={{ width: '320px', borderLeft: '1px solid #e2e8f0', padding: '18px 20px', overflowY: 'auto', flexShrink: 0 }}>
+              {/* Right-hand column: tuple responsibility pie + node inspector (a side panel, not a second popup) */}
+              {(responsibilityLoading || (tupleResponsibility && tupleResponsibility.length > 0) || selectedCircuitNode) && (
+                <div style={{ width: '340px', borderLeft: '1px solid #e2e8f0', overflowY: 'auto', flexShrink: 0 }}>
+                  <PieChart data={tupleResponsibility} loading={responsibilityLoading} />
+                  {selectedCircuitNode && (
+                <div style={{ padding: '18px 20px', borderTop: '1px solid #e2e8f0' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px', marginBottom: '10px' }}>
                     <h4 style={{ margin: 0, fontSize: '14px' }}>
                       {selectedCircuitNode.data?.gateType?.toUpperCase() || 'Gate'} details
@@ -384,6 +518,8 @@ export function ProvSQLVisualizer({
                       combination of other gates, not a single source row. Expand toward the leaves
                       (bottom of the diagram) to find the INPUT gates it was built from.
                     </p>
+                  )}
+                </div>
                   )}
                 </div>
               )}
