@@ -841,6 +841,7 @@ input[type="checkbox"]:disabled { cursor: not-allowed; }
   flex-direction: column;
   z-index: 20;
   font-family: 'IBM Plex Sans', sans-serif;
+  overflow-y: auto; /* if the canvas is short, scroll the whole panel instead of clipping it */
 }
 
 .stage-panel-header {

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import ReactFlow, { Background, Controls } from 'reactflow';
 import { PlanNode } from './PlanNode';
 import { StagePanel } from './StagePanel';
@@ -69,6 +69,11 @@ export const QueryTree = ({
   const planFs = useFullscreen(() => {
     if (planRf.current) planRf.current.fitView({ padding: 0.2, duration: 250 });
   });
+
+  // Node details only open in the expanded view, so close them when it closes.
+  useEffect(() => {
+    if (!planFs.isFs && stagePanel) onStagePanelClose();
+  }, [planFs.isFs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleTabChange = (nextTab) => {
     setSubTab(nextTab);
@@ -141,7 +146,11 @@ export const QueryTree = ({
                     onNodesChange={onPlanNodesChange}
                     onEdgesChange={onPlanEdgesChange}
                     nodeTypes={nodeTypes}
-                    onNodeClick={onPlanNodeClick}
+                    onNodeClick={(evt, node) => {
+                      // The stage panel needs room to scroll, so open it in the expanded view.
+                      if (!planFs.isFs) planFs.enter();
+                      onPlanNodeClick(evt, node);
+                    }}
                     onInit={(inst) => { planRf.current = inst; }}
                     fitView
                     fitViewOptions={{ padding: 0.2 }}

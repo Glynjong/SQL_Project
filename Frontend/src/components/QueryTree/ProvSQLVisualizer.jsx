@@ -333,12 +333,13 @@ export function ProvSQLVisualizer({
       </div>
 
       {/* Query Output Table with Provenance Tokens */}
-      <div style={{ flex: 1, overflow: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', background: '#ffffff' }}>
+      {/* Capped height so a long result scrolls inside the box; the header row stays pinned. */}
+      <div style={{ maxHeight: '55vh', overflow: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', background: '#ffffff' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
           <thead>
-            <tr style={{ background: '#f1f5f9', textAlign: 'left' }}>
+            <tr style={{ textAlign: 'left' }}>
               {provFields.map((f) => (
-                <th key={f} style={{ padding: '8px 12px', borderBottom: '1px solid #cbd5e1' }}>{f}</th>
+                <th key={f} style={{ padding: '8px 12px', borderBottom: '1px solid #cbd5e1', background: '#f1f5f9', position: 'sticky', top: 0, zIndex: 1 }}>{f}</th>
               ))}
             </tr>
           </thead>

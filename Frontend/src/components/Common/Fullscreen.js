@@ -53,7 +53,7 @@ export function useFullscreen(onChange) {
       }
     : undefined;
 
-  return { ref, isFs, toggle, style };
+  return { ref, isFs, toggle, enter, style };
 }
 
 export function FullscreenButton({ isFs, onToggle }) {
