@@ -1,7 +1,7 @@
 import React from 'react';
 import '../../App.css';
 
-export const Sidebar = ({ tables, activeTab, onTableClick }) => {
+export const Sidebar = ({ tables, activeTab, onTableClick, onImportTable }) => {
   const getSidebarIcon = () => {
     switch (activeTab) {
       case 'runner':
@@ -22,7 +22,14 @@ export const Sidebar = ({ tables, activeTab, onTableClick }) => {
 
   return (
     <div className="sidebar">
-      <div className="sidebar-header">Tables</div>
+      <div className="sidebar-header">
+        <span>Tables</span>
+        {onImportTable && (
+          <button className="sidebar-header-btn" onClick={onImportTable} title="Import a table from a CSV file">
+            ⬆ Import
+          </button>
+        )}
+      </div>
       <div className="sidebar-list">
         {tables.map((table) => (
           <div

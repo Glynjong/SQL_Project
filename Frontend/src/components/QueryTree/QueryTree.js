@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import ReactFlow, { Background, Controls } from 'reactflow';
 import { PlanNode } from './PlanNode';
 import { StagePanel } from './StagePanel';
@@ -7,6 +7,7 @@ import { ExecutionStepViewer } from './ExecutionStepViewer';
 import { LogicalTree } from './LogicalTree';
 import { ProvSQLVisualizer } from './ProvSQLVisualizer';
 import { EmptyState } from '../Common/EmptyState';
+import { useFullscreen, FullscreenButton } from '../Common/Fullscreen';
 import '../../App.css';
 
 const nodeTypes = { planNode: PlanNode };
@@ -64,6 +65,10 @@ export const QueryTree = ({
   onFetchCircuit,
 }) => {
   const [subTab, setSubTab] = useState('physical'); // 'physical' | 'logical' | 'provsql'
+  const planRf = useRef(null);
+  const planFs = useFullscreen(() => {
+    if (planRf.current) planRf.current.fitView({ padding: 0.2, duration: 250 });
+  });
 
   const handleTabChange = (nextTab) => {
     setSubTab(nextTab);
@@ -127,8 +132,9 @@ export const QueryTree = ({
 
           {planNodes.length > 0 && (
             <div className="tree-canvas-wrap">
-              <div style={{ display: 'flex', height: '100%' }}>
+              <div ref={planFs.ref} style={{ display: 'flex', height: '100%', ...planFs.style }}>
                 <div style={{ flex: 1, position: 'relative' }}>
+                  <FullscreenButton isFs={planFs.isFs} onToggle={planFs.toggle} />
                   <ReactFlow
                     nodes={planNodes}
                     edges={planEdges}
@@ -136,6 +142,7 @@ export const QueryTree = ({
                     onEdgesChange={onPlanEdgesChange}
                     nodeTypes={nodeTypes}
                     onNodeClick={onPlanNodeClick}
+                    onInit={(inst) => { planRf.current = inst; }}
                     fitView
                     fitViewOptions={{ padding: 0.2 }}
                     className="react-flow-canvas"

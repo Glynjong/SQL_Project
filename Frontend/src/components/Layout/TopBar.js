@@ -3,9 +3,14 @@ import '../../App.css';
 
 export const TopBar = ({ activeTab, onTabChange }) => (
   <div className="top-bar">
-    <span className="top-bar-title">
+    <a
+      className="top-bar-title top-bar-title--link"
+      href="#home"
+      title="Go to the home page"
+      onClick={(e) => { e.preventDefault(); onTabChange('home'); }}
+    >
       SQL <span>Visual</span> Debugger
-    </span>
+    </a>
     <button
       className={`tab-btn ${activeTab === 'home' ? 'active' : ''}`}
       onClick={() => onTabChange('home')}

@@ -180,7 +180,10 @@ app.post('/run-query', async (req, res) => {
   const { sql } = req.body;
   console.log('Executing query:', sql);
   try {
-    const result = await queryIsolated(sql);
+    // Several statements in one request come back as an array of results
+    // (all already committed) — report the last one, like psql does.
+    const raw = await queryIsolated(sql);
+    const result = Array.isArray(raw) ? raw[raw.length - 1] : raw;
     console.log('Query result:', { rows: result.rows.length, command: result.command, rowCount: result.rowCount });
     
     // Check if this was a SELECT (has rows) or a CREATE/INSERT (has rowCount/command)
@@ -411,13 +414,17 @@ app.post('/provsql/provenance', async (req, res) => {
     try {
       const plainRaw = (await queryShadowed(trimmed)) || (await queryReadOnlyIsolated(trimmed));
       const plain = Array.isArray(plainRaw) ? plainRaw[plainRaw.length - 1] : plainRaw;
+      // ProvSQL handles recursion with set semantics (UNION) but not bag semantics (UNION ALL).
+      const tip = /recursi/i.test(firstError.message) && /\bUNION\s+ALL\b/i.test(trimmed)
+        ? ' Tip: to get provenance for this recursive query, try changing UNION ALL to UNION.'
+        : '';
       return res.json({
         success: true,
         rows: plain.rows || [],
         fields: fieldNamesOf(plain),
         provenanceUnavailable: true,
         notes: [
-          `ProvSQL couldn't track provenance for this query (${firstError.message}), so these are plain results without provenance tokens — rows can't be opened as circuits.`,
+          `ProvSQL couldn't track provenance for this query (${firstError.message}), so these are plain results without provenance tokens — rows can't be opened as circuits.${tip}`,
         ],
       });
     } catch (err) {

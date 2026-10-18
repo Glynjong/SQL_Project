@@ -172,9 +172,32 @@ export function HomePage({ onOpenInAnalyzer, onOpenInRunner }) {
                   </div>
                   <p style={{ margin: '6px 0 10px', fontSize: 13, color: 'var(--text-mid)', lineHeight: 1.5 }}>{ex.note}</p>
 
-                  <pre style={{ margin: 0, padding: 14, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12.5, lineHeight: 1.55, overflowX: 'auto', fontFamily: 'ui-monospace, Menlo, Consolas, monospace' }}>
+                  <div style={{ position: 'relative' }}>
+                  <button
+                    type="button"
+                    onClick={() => copy(ex)}
+                    title={copied === ex.id ? 'Copied!' : 'Copy SQL'}
+                    aria-label="Copy SQL"
+                    style={{
+                      position: 'absolute', top: 8, right: 8, zIndex: 1, height: 28, minWidth: 28, padding: copied === ex.id ? '0 8px' : 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                      background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer',
+                      color: copied === ex.id ? '#16a34a' : '#475569', fontSize: 11, fontWeight: 700,
+                    }}
+                  >
+                    {copied === ex.id ? (
+                      <>✓ Copied</>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="5.5" y="5.5" width="9" height="9" rx="1.5" />
+                        <path d="M10.5 5.5V3a1.5 1.5 0 0 0-1.5-1.5H3A1.5 1.5 0 0 0 1.5 3v6A1.5 1.5 0 0 0 3 10.5h2.5" />
+                      </svg>
+                    )}
+                  </button>
+                  <pre style={{ margin: 0, padding: 14, paddingRight: 48, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12.5, lineHeight: 1.55, overflowX: 'auto', fontFamily: 'ui-monospace, Menlo, Consolas, monospace' }}>
                     <Sql text={ex.sql} />
                   </pre>
+                  </div>
 
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 0' }}>
                     <button style={smallBtn('#2563eb')} onClick={() => run(ex)} disabled={r && r.status === 'running'}>
@@ -182,7 +205,6 @@ export function HomePage({ onOpenInAnalyzer, onOpenInRunner }) {
                     </button>
                     <button style={smallBtn('#7c3aed')} onClick={() => onOpenInAnalyzer(ex.sql)}>🌳 Open in Query Tree</button>
                     <button style={smallBtn('#fff', '#334155', '1px solid #cbd5e1')} onClick={() => onOpenInRunner(ex.sql)}>✎ Open in Runner</button>
-                    <button style={smallBtn('#fff', '#334155', '1px solid #cbd5e1')} onClick={() => copy(ex)}>{copied === ex.id ? 'Copied ✓' : 'Copy'}</button>
                   </div>
 
                   {r && r.status === 'error' && (

@@ -9,12 +9,13 @@ export const AppLayout = ({
   onTabChange,
   tables,
   onTableClick,
+  onImportTable,
 }) => (
   <div className="app-shell">
     <TopBar activeTab={activeTab} onTabChange={onTabChange} />
     <div className="body-layout">
       {activeTab !== 'home' && (
-        <Sidebar tables={tables} activeTab={activeTab} onTableClick={onTableClick} />
+        <Sidebar tables={tables} activeTab={activeTab} onTableClick={onTableClick} onImportTable={onImportTable} />
       )}
       <div className="content-area">{children}</div>
     </div>

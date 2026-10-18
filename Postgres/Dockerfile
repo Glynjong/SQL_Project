@@ -26,7 +26,7 @@ WORKDIR /tmp/provsql
 
 # Pin a known-good tag rather than tracking master, so the image is
 # reproducible. Bump this when you deliberately want a newer ProvSQL.
-ARG PROVSQL_VERSION=v1.5.0
+ARG PROVSQL_VERSION=v1.8.0
 # Pin PG_CONFIG explicitly (rather than relying on PATH order) so the build
 # always targets this image's actual Postgres install, never an apk one.
 ENV PG_CONFIG=/usr/local/bin/pg_config

@@ -4,6 +4,7 @@ import { QueryRunner } from './components/QueryRunner/QueryRunner';
 import { HomePage } from './components/Home/HomePage';
 import { SchemaVisualizer } from './components/SchemaVisualizer/SchemaVisualizer';
 import { QueryTree } from './components/QueryTree/QueryTree';
+import { ImportTableModal } from './components/Import/ImportTableModal';
 import { TableDataPopup } from './components/Common/TableDataPopup';
 import { useTabs } from './hooks/useTabs';
 import { useQueryRunner } from './hooks/useQueryRunner';
@@ -22,6 +23,9 @@ function App() {
   const queryTree = useQueryTree();
   const logicalTree = useLogicalTree();
   const provSQL = useProvSQL();
+
+  const [importOpen, setImportOpen] = useState(false);
+  const [importNotice, setImportNotice] = useState('');
 
   // Popup state for table data
   const [popup, setPopup] = useState({ tableName: null, data: [], isLoading: false, error: null });
@@ -160,7 +164,6 @@ function App() {
             edges={schemaVisualizer.edges}
             onNodesChange={schemaVisualizer.onNodesChange}
             onEdgesChange={schemaVisualizer.onEdgesChange}
-            onConnect={schemaVisualizer.onConnect}
             onNodeClick={handleSchemaNodeClick}
             onClearCanvas={schemaVisualizer.clearCanvas}
             onLoadAllTables={schemaVisualizer.addAllTablesToCanvas}
@@ -241,9 +244,27 @@ function App() {
         onTabChange={handleTabChange}
         tables={Object.keys(schemaVisualizer.schemaData)}
         onTableClick={handleSidebarClick}
+        onImportTable={() => setImportOpen(true)}
       >
         {renderTabContent()}
       </AppLayout>
+      <ImportTableModal
+        open={importOpen}
+        existingTables={Object.keys(schemaVisualizer.schemaData)}
+        onClose={() => setImportOpen(false)}
+        onImported={async (name, count) => {
+          setImportOpen(false);
+          const fresh = await schemaVisualizer.loadSchemaMetadata();
+          try { await schemaVisualizer.addTableToCanvas(name, fresh && fresh[name]); } catch (e) { /* canvas update is best-effort */ }
+          setImportNotice(`Imported "${name}" (${count} rows).`);
+          setTimeout(() => setImportNotice(''), 5000);
+        }}
+      />
+      {importNotice && (
+        <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: '#166534', color: '#fff', padding: '10px 18px', borderRadius: 8, fontSize: 13, zIndex: 1100, boxShadow: '0 6px 20px rgba(0,0,0,.25)' }}>
+          {importNotice}
+        </div>
+      )}
       <TableDataPopup
         tableName={popup.tableName}
         data={popup.data}

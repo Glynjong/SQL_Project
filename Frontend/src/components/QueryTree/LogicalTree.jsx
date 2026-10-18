@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import ReactFlow, { Background, Controls, Handle, Position } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { useFullscreen, FullscreenButton } from '../Common/Fullscreen';
 import { CATEGORY_STYLES, SIMPLE_LEGEND, FULL_LEGEND } from '../../utils/astSimplify';
 
 const clamp = (lines) => ({
@@ -99,6 +100,9 @@ export function LogicalTree({
   onReparse,
 }) {
   const rfRef = useRef(null);
+  const fs = useFullscreen(() => {
+    if (rfRef.current) rfRef.current.fitView({ padding: 0.15, minZoom: 0.1, maxZoom: 1.1, duration: 250 });
+  });
   const c = controls || {};
   const legend = c.viewMode === 'full' ? FULL_LEGEND : SIMPLE_LEGEND;
   const d = selectedNode ? selectedNode.data : null;
@@ -117,7 +121,7 @@ export function LogicalTree({
   const shownJson = rawJson.length > 12000 ? `${rawJson.slice(0, 12000)}\n… (truncated)` : rawJson;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: '520px', gap: '10px' }}>
+    <div ref={fs.ref} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: '520px', gap: '10px', ...fs.style }}>
       {/* toolbar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 0 }}>
@@ -178,6 +182,7 @@ export function LogicalTree({
 
       <div style={{ display: 'flex', width: '100%', flex: 1, gap: '16px', minHeight: 0 }}>
         <div style={{ flex: 1, position: 'relative', border: '1px solid #e2e8f0', borderRadius: '8px', background: '#f8fafc' }}>
+          <FullscreenButton isFs={fs.isFs} onToggle={fs.toggle} />
           {isLoading && (
             <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 10, background: '#fff', padding: '8px 16px', borderRadius: '6px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
               Parsing AST...
@@ -210,7 +215,7 @@ export function LogicalTree({
         </div>
 
         {d && (
-          <div style={{ width: '340px', flexShrink: 0, border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', background: '#ffffff', overflowY: 'auto', maxHeight: '70vh' }}>
+          <div style={{ width: '340px', flexShrink: 0, border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', background: '#ffffff', overflowY: 'auto', maxHeight: fs.isFs ? '100%' : '70vh' }}>
             <h3 style={{ marginTop: 0, marginBottom: 4, fontSize: 15, wordBreak: 'break-word' }}>{d.title}</h3>
             <div style={{ fontSize: 11, color: '#64748b', marginBottom: 10 }}>
               {(CATEGORY_STYLES[d.category] || CATEGORY_STYLES.other).name}

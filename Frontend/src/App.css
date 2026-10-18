@@ -124,6 +124,30 @@ body { background: var(--bg); color: var(--text); }
   background: var(--surface-2);
 }
 
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sidebar-header-btn {
+  padding: 4px 10px;
+  border: 1px solid #93c5fd;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.sidebar-header-btn:hover {
+  background: #dbeafe;
+}
+
 .sidebar-list {
   flex: 1;
   overflow-y: auto;
@@ -1160,3 +1184,93 @@ body { background: var(--bg); color: var(--text); }
 ::-webkit-scrollbar-track  { background: transparent; }
 ::-webkit-scrollbar-thumb  { background: var(--border-mid); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* Brand name doubles as a link to the Home tab */
+.top-bar-title--link {
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.top-bar-title--link:hover {
+  opacity: 0.8;
+}
+
+/* ─── Schema Visualizer: make the connection dots discoverable ───────────── */
+.react-flow__node .react-flow__handle {
+  width: 14px;
+  height: 14px;
+  background: #ffffff;
+  border: 2px solid var(--blue);
+  cursor: crosshair;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.react-flow__node:hover .react-flow__handle {
+  animation: handle-pulse 1.4s ease-out infinite;
+}
+
+.react-flow__node .react-flow__handle:hover {
+  background: var(--blue);
+  transform: translate(-50%, -50%) scale(1.35);
+  animation: none;
+}
+
+.react-flow__node .react-flow__handle-top:hover { transform: translate(-50%, -50%) scale(1.35); }
+.react-flow__node .react-flow__handle-bottom:hover { transform: translate(-50%, 50%) scale(1.35); }
+
+.react-flow__node .react-flow__handle:hover::after {
+  content: 'Drag to link to another table';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: var(--navy);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.react-flow__node .react-flow__handle-top:hover::after { bottom: 22px; }
+.react-flow__node .react-flow__handle-bottom:hover::after { top: 22px; }
+
+@keyframes handle-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.55); }
+  100% { box-shadow: 0 0 0 10px rgba(52, 152, 219, 0); }
+}
+
+.link-hint {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9;
+  max-width: min(640px, 90%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
+  border-radius: 10px;
+  color: #1e3a8a;
+  font-size: 12.5px;
+  line-height: 1.5;
+  box-shadow: var(--shadow-md);
+}
+
+.link-hint-icon { font-size: 16px; }
+
+.link-hint-close {
+  margin-left: 4px;
+  border: none;
+  background: transparent;
+  color: #1e3a8a;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}

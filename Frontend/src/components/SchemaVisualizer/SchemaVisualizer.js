@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import ReactFlow, { Background, Controls } from 'reactflow';
+import ReactFlow, { Background, Controls, ConnectionMode } from 'reactflow';
 import 'reactflow/dist/style.css';
 import '../../App.css';
 import { COLUMN_TYPES } from '../../utils/schemaUtils';
 import { EditTableModal } from './EditTableModal';
+import { LinkTablesModal } from './LinkTablesModal';
 
 // "Edit table" as a normal toolbar button that opens a menu of tables — a
 // native <select> can't be styled to match the other buttons.
@@ -50,23 +51,27 @@ const EditTableMenu = ({ tables, onEditTable }) => {
   );
 };
 
-export const VisualizerToolbar = ({ onClearCanvas, onLoadAllTables, onOpenAddTable, tables = [], onEditTable }) => (
+export const VisualizerToolbar = ({ onClearCanvas, onLoadAllTables, onOpenAddTable, tables = [], onEditTable, onOpenLink }) => (
   <div className="visualizer-toolbar">
     <div className="visualizer-legend">
       <span>
         <span className="legend-circle legend-circle--green" />
         FK relationship 
       </span>
-      <span>
-        <span className="legend-circle legend-circle--blue" />
-        Manual connection
-      </span>
-      <span className="visualizer-legend-hint">Drag handle to connect · Double-click a table to edit</span>
+      <span className="visualizer-legend-hint">Drag one table's handle onto another to link them</span>
     </div>
     <div className="toolbar-buttons">
       <EditTableMenu tables={tables} onEditTable={onEditTable} />
       <button className="btn-primary" onClick={onOpenAddTable}>
         + Add Table
+      </button>
+      <button
+        className="btn-primary"
+        onClick={onOpenLink}
+        disabled={tables.length === 0}
+        title="Create a foreign key between two tables (or drag from one table's dot to another's)"
+      >
+        🔗 Link Tables
       </button>
       <button className="btn-primary" onClick={onLoadAllTables}>
         Load All Tables
@@ -208,7 +213,6 @@ export const SchemaVisualizer = ({
   edges,
   onNodesChange,
   onEdgesChange,
-  onConnect,
   onNodeClick,
   onClearCanvas,
   onLoadAllTables,
@@ -221,6 +225,30 @@ export const SchemaVisualizer = ({
 }) => {
   const [addTableOpen, setAddTableOpen] = useState(false);
   const [editTable, setEditTable] = useState(null);
+  const [link, setLink] = useState(null); // { source, target } while the Link tables dialog is open
+  const [hintDismissed, setHintDismissed] = useState(() => {
+    try { return localStorage.getItem('schemaLinkHintDismissed') === '1'; } catch (e) { return false; }
+  });
+  const dismissHint = () => {
+    setHintDismissed(true);
+    try { localStorage.setItem('schemaLinkHintDismissed', '1'); } catch (e) { /* storage unavailable: hint just returns next visit */ }
+  };
+
+  // Toolbar button: open the dialog with the first two tables, the user picks the real ones there.
+  const openLinkDialog = () => {
+    const names = Object.keys(schemaData);
+    if (!names.length) return;
+    if (onCloseTablePopup) onCloseTablePopup();
+    setLink({ source: names[0], target: names[1] || names[0] });
+  };
+
+  // Dragging a connection opens the dialog instead of drawing a throw-away line.
+  const handleConnect = (params) => {
+    if (params.source && params.target && schemaData[params.source] && schemaData[params.target]) {
+      if (onCloseTablePopup) onCloseTablePopup();
+      setLink({ source: params.source, target: params.target });
+    }
+  };
 
   // Opening the editor closes the read-only data popup that a single click opens.
   const startEdit = (tableName) => {
@@ -236,10 +264,22 @@ export const SchemaVisualizer = ({
         onOpenAddTable={() => setAddTableOpen(true)}
         tables={Object.keys(schemaData)}
         onEditTable={startEdit}
+        onOpenLink={openLinkDialog}
       />
 
       {addTableOpen && (
         <AddTableModal onClose={() => setAddTableOpen(false)} onCreateTable={onCreateTable} />
+      )}
+
+      {link && (
+        <LinkTablesModal
+          key={`${link.source}->${link.target}`}
+          source={link.source}
+          target={link.target}
+          schemaData={schemaData}
+          onClose={() => setLink(null)}
+          onLinked={() => onSchemaChanged()}
+        />
       )}
 
       {editTable && (
@@ -289,12 +329,24 @@ export const SchemaVisualizer = ({
         </div>
       )}
 
+      {!hintDismissed && nodes.length > 0 && (
+        <div className="link-hint" role="note">
+          <span className="link-hint-icon">🔗</span>
+          <span>
+            <strong>Tip:</strong> drag from the dot on the edge of one table to the dot on another to link them
+            with a foreign key — or use the <strong>Link Tables</strong> button.
+          </span>
+          <button className="link-hint-close" onClick={dismissHint} aria-label="Dismiss tip">×</button>
+        </div>
+      )}
+
       <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
+        onConnect={handleConnect}
+        connectionMode={ConnectionMode.Loose}
         onNodeClick={onNodeClick}
         onNodeDoubleClick={(evt, node) => startEdit(node.id)}
         fitView
