@@ -314,7 +314,7 @@ export function ProvSQLVisualizer({
       {provNotes.length > 0 && (
         <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', color: '#92400e', padding: '10px 14px', borderRadius: '6px', fontSize: '12px' }}>
           {provNotes.map((n, i) => (
-            <div key={i}>ℹ️ {n}</div>
+            <div key={i}>{n}</div>
           ))}
         </div>
       )}
@@ -334,7 +334,7 @@ export function ProvSQLVisualizer({
             cursor: isLoading ? 'not-allowed' : 'pointer'
           }}
         >
-          {isLoading ? 'Running…' : '▶ Run Provenance Query'}
+          {isLoading ? 'Running…' : 'Run Provenance Query'}
         </button>
         <span style={{ marginLeft: '10px', fontSize: '12px', color: '#64748b' }}>
           Runs the query currently in the box above. This tab doesn't auto-refresh when you edit

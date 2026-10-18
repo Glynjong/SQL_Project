@@ -12,10 +12,10 @@ export const createDatabaseNode = (tableName, columns) => ({
             <div key={c.name} className="column-row">
               <span className="column-icon">
                 {c.constraint === 'PRIMARY KEY'
-                  ? '🔑'
+                  ? 'PK'
                   : c.constraint === 'FOREIGN KEY'
-                  ? '🔗'
-                  : '🔹'}
+                  ? 'FK'
+                  : ''}
               </span>
               <span className={`column-name ${c.constraint === 'PRIMARY KEY' ? 'pk-bold' : ''}`}>
                 {c.name}

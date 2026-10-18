@@ -147,7 +147,7 @@ function DataTab({ table, columns }) {
             <tr>
               {columns.map((c) => (
                 <th key={c.name} style={th}>
-                  {c.constraints.includes('PRIMARY KEY') ? '🔑 ' : ''}{c.name}
+                  {c.name}{c.constraints.includes('PRIMARY KEY') ? ' (PK)' : ''}
                   <div style={{ fontWeight: 400, color: '#94a3b8', fontSize: 10 }}>{c.type}</div>
                 </th>
               ))}

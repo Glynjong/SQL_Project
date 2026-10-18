@@ -15,7 +15,7 @@ export const TopBar = ({ activeTab, onTabChange }) => (
       className={`tab-btn ${activeTab === 'home' ? 'active' : ''}`}
       onClick={() => onTabChange('home')}
     >
-      🏠 Home
+      Home
     </button>
     <button
       className={`tab-btn ${activeTab === 'runner' ? 'active' : ''}`}
@@ -33,7 +33,7 @@ export const TopBar = ({ activeTab, onTabChange }) => (
       className={`tab-btn ${activeTab === 'querytree' ? 'active' : ''}`}
       onClick={() => onTabChange('querytree')}
     >
-      🌳 Query Tree
+      Query Tree
     </button>
   </div>
 );

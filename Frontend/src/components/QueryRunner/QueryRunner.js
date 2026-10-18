@@ -1,23 +1,20 @@
 import React from 'react';
 import { ResultsTable } from '../Common/ResultsTable';
 import { EmptyState } from '../Common/EmptyState';
+import { SqlEditor } from '../Common/SqlEditor';
 import '../../App.css';
 
+// Same layout as the Query Tree toolbar: auto-growing editor, button on the right.
 export const QueryEditor = ({ query, onChange, onExecute, isLoading }) => (
-  <div className="query-editor-wrap">
-    <div className="query-editor-label">SQL Query</div>
-    <textarea
-      className="query-editor"
-      value={query}
-      onChange={(e) => onChange(e.target.value)}
-    />
-    <div className="runner-actions">
+  <div className="tree-toolbar runner-toolbar">
+    <SqlEditor value={query} onChange={onChange} />
+    <div style={{ display: 'flex', gap: '8px' }}>
       <button
         className="btn-primary"
         onClick={onExecute}
         disabled={isLoading}
       >
-        {isLoading ? 'Executing...' : '▶ Run Query'}
+        {isLoading ? 'Executing...' : 'Run Query'}
       </button>
     </div>
   </div>
@@ -32,7 +29,7 @@ export const QueryRunner = ({ query, results, isLoading, error, onQueryChange, o
       isLoading={isLoading}
     />
     <div className="results-wrap">
-      {error && <div className="results-empty results-error">⚠️ {error}</div>}
+      {error && <div className="results-empty results-error">{error}</div>}
       {!error && results.length > 0 && <ResultsTable rows={results} />}
       {!error && results.length === 0 && !isLoading && (
         <EmptyState title="Run a query to see results" />

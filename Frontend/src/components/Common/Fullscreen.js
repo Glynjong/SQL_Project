@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 
 // Expand a container into a centered modal (dimmed backdrop, rounded panel).
-// Esc or the ✕ button closes it. The dimming is a huge box-shadow on the panel
+// Esc, the ✕ button, or a click outside the panel closes it. The dimming is a huge box-shadow on the panel
 // itself, so no extra element has to be rendered by the caller.
 export function useFullscreen(onChange) {
   const ref = useRef(null);
@@ -26,8 +26,22 @@ export function useFullscreen(onChange) {
   useEffect(() => {
     if (!isFs) return undefined;
     const onKey = (e) => { if (e.key === 'Escape') exit(); };
+    // Clicking the dimmed area closes the modal. There is no backdrop element,
+    // so that click would otherwise reach whatever is underneath — swallow it.
+    const swallow = (e) => { e.stopPropagation(); e.preventDefault(); };
+    const onDown = (e) => {
+      if (!ref.current || ref.current.contains(e.target)) return;
+      swallow(e);
+      window.addEventListener('click', swallow, { capture: true, once: true });
+      setTimeout(() => window.removeEventListener('click', swallow, { capture: true }), 500);
+      exit();
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('pointerdown', onDown, true);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('pointerdown', onDown, true);
+    };
   }, [isFs, exit]);
 
   // Applied to the container: fills the window while active.

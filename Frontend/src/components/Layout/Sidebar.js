@@ -2,19 +2,6 @@ import React from 'react';
 import '../../App.css';
 
 export const Sidebar = ({ tables, activeTab, onTableClick, onImportTable }) => {
-  const getSidebarIcon = () => {
-    switch (activeTab) {
-      case 'runner':
-        return '👁️';
-      case 'visualizer':
-        return '➕';
-      case 'querytree':
-        return '🌳';
-      default:
-        return '👁️';
-    }
-  };
-
   const handleClick = (table) => {
     console.log('Sidebar item clicked:', table);
     onTableClick(table);
@@ -26,7 +13,7 @@ export const Sidebar = ({ tables, activeTab, onTableClick, onImportTable }) => {
         <span>Tables</span>
         {onImportTable && (
           <button className="sidebar-header-btn" onClick={onImportTable} title="Import a table from a CSV file">
-            ⬆ Import
+            Import
           </button>
         )}
       </div>
@@ -37,7 +24,6 @@ export const Sidebar = ({ tables, activeTab, onTableClick, onImportTable }) => {
             className="sidebar-item"
             onClick={() => handleClick(table)}
           >
-            <span className="sidebar-item-icon">{getSidebarIcon()}</span>
             {table}
           </div>
         ))}

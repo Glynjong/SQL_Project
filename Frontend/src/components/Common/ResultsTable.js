@@ -5,7 +5,6 @@ export const ResultsTable = ({ rows }) => {
   if (!rows || rows.length === 0)
     return (
       <div className="results-empty">
-        <div className="results-empty-icon">📭</div>
         <span>No rows returned</span>
       </div>
     );

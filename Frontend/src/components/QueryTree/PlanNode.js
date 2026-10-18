@@ -17,14 +17,14 @@ export const PlanNode = ({ data }) => {
       <div className="plan-node-body">
         {data.relation && (
           <div className="plan-node-relation">
-            📋 {data.relation}
+            {data.relation}
             {data.alias && data.alias !== data.relation ? ` (${data.alias})` : ''}
           </div>
         )}
-        {data.indexName && <div className="plan-node-index">🗂 {data.indexName}</div>}
-        {data.filter && <div className="plan-node-filter">🔍 {data.filter}</div>}
-        {data.hashCond && <div className="plan-node-filter">⚙️ Hash Cond: {data.hashCond}</div>}
-        {data.joinFilter && <div className="plan-node-filter">🔗 {data.joinFilter}</div>}
+        {data.indexName && <div className="plan-node-index">Index: {data.indexName}</div>}
+        {data.filter && <div className="plan-node-filter">Filter: {data.filter}</div>}
+        {data.hashCond && <div className="plan-node-filter">Hash Cond: {data.hashCond}</div>}
+        {data.joinFilter && <div className="plan-node-filter">Join Filter: {data.joinFilter}</div>}
 
         <div className="plan-node-stats">
           <span className="plan-stat">

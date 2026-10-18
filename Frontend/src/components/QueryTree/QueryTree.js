@@ -99,19 +99,19 @@ export const QueryTree = ({
           className={`tree-subtab ${subTab === 'physical' ? 'tree-subtab--active' : ''}`}
           onClick={() => handleTabChange('physical')}
         >
-          🌳 Physical Plan
+          Physical Plan
         </button>
         <button
           className={`tree-subtab ${subTab === 'logical' ? 'tree-subtab--active' : ''}`}
           onClick={() => handleTabChange('logical')}
         >
-          🧩 Logical Tree (AST)
+          Logical Tree (AST)
         </button>
         <button
           className={`tree-subtab ${subTab === 'provsql' ? 'tree-subtab--active' : ''}`}
           onClick={() => handleTabChange('provsql')}
         >
-          🔍 ProvSQL Provenance
+          ProvSQL Provenance
         </button>
       </div>
 
@@ -120,11 +120,10 @@ export const QueryTree = ({
         <>
           <TreeLegend />
 
-          {planError && <div className="tree-error">⚠️ {planError}</div>}
+          {planError && <div className="tree-error">{planError}</div>}
 
           {!planLoading && planNodes.length === 0 && !planError && (
             <EmptyState
-              icon="🌳"
               title="No query plan yet"
               subtitle="Write a SQL query above and click Explain to visualize the execution tree"
             />
@@ -176,7 +175,6 @@ export const QueryTree = ({
         <div className="tree-panel-wrap">
           {!astLoading && astNodes.length === 0 && !astError ? (
             <EmptyState
-              icon="🧩"
               title="No AST parsed yet"
               subtitle="Write a SQL query above, then open this tab to parse its logical structure"
             />

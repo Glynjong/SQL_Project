@@ -56,10 +56,14 @@ export const extractExecutionSteps = (plan, originalQuery) => {
     });
   };
 
+  // EXPLAIN (FORMAT JSON) wraps the root operator as { Plan: {...}, Planning Time, ... };
+  // unwrap it like buildFlowFromPlan does, but still accept a bare plan node.
+  const root = plan && plan['Plan'] ? plan['Plan'] : plan;
+
   // Derive stage SQLs first
-  deriveStageSQLs(plan, originalQuery);
-  
-  traversePlan(plan);
+  deriveStageSQLs(root, originalQuery);
+
+  traversePlan(root);
   return steps;
 };
 

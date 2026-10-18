@@ -58,6 +58,8 @@ services:
     environment:
       - REACT_APP_API_URL=http://localhost:5000
       - CI=false
+      # File-change events don't cross a Windows bind mount, so poll for edits
+      - WATCHPACK_POLLING=true
     command: npm start
     depends_on:
       - backend

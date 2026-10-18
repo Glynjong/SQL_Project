@@ -11,17 +11,17 @@ let idCounter = 0;
 const nextId = () => `m${++idCounter}`;
 
 export const CATEGORY_STYLES = {
-  query: { color: '#2563eb', bg: '#eff6ff', icon: '📄', name: 'Query' },
-  clause: { color: '#0891b2', bg: '#ecfeff', icon: '📋', name: 'Clause' },
-  table: { color: '#059669', bg: '#ecfdf5', icon: '🗂️', name: 'Table' },
-  join: { color: '#0d9488', bg: '#f0fdfa', icon: '🔗', name: 'Join' },
-  condition: { color: '#d97706', bg: '#fffbeb', icon: '⚖️', name: 'Condition' },
-  subquery: { color: '#7c3aed', bg: '#f5f3ff', icon: '🧩', name: 'Subquery / CTE' },
+  query: { color: '#2563eb', bg: '#eff6ff', name: 'Query' },
+  clause: { color: '#0891b2', bg: '#ecfeff', name: 'Clause' },
+  table: { color: '#059669', bg: '#ecfdf5', name: 'Table' },
+  join: { color: '#0d9488', bg: '#f0fdfa', name: 'Join' },
+  condition: { color: '#d97706', bg: '#fffbeb', name: 'Condition' },
+  subquery: { color: '#7c3aed', bg: '#f5f3ff', name: 'Subquery / CTE' },
   expression: { color: '#64748b', bg: '#f8fafc', icon: 'ƒ', name: 'Expression' },
-  reference: { color: '#059669', bg: '#ecfdf5', icon: '🔗', name: 'Reference' },
-  operator: { color: '#d97706', bg: '#fffbeb', icon: '⚙️', name: 'Operator / Function' },
-  literal: { color: '#7c3aed', bg: '#f5f3ff', icon: '🔢', name: 'Literal' },
-  other: { color: '#475569', bg: '#f8fafc', icon: '⚪', name: 'Other' },
+  reference: { color: '#059669', bg: '#ecfdf5', name: 'Reference' },
+  operator: { color: '#d97706', bg: '#fffbeb', name: 'Operator / Function' },
+  literal: { color: '#7c3aed', bg: '#f5f3ff', name: 'Literal' },
+  other: { color: '#475569', bg: '#f8fafc', name: 'Other' },
 };
 
 export const SIMPLE_LEGEND = ['query', 'clause', 'table', 'join', 'condition', 'subquery'];

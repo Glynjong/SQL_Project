@@ -32,7 +32,7 @@ const EditTableMenu = ({ tables, onEditTable }) => {
         disabled={tables.length === 0}
         title={tables.length === 0 ? 'No tables loaded yet' : "Edit a table's structure or rows"}
       >
-        ✏️ Edit Table ▾
+        Edit Table ▾
       </button>
       {open && (
         <div className="toolbar-menu-list">
@@ -71,7 +71,7 @@ export const VisualizerToolbar = ({ onClearCanvas, onLoadAllTables, onOpenAddTab
         disabled={tables.length === 0}
         title="Create a foreign key between two tables (or drag from one table's dot to another's)"
       >
-        🔗 Link Tables
+        Link Tables
       </button>
       <button className="btn-primary" onClick={onLoadAllTables}>
         Load All Tables
@@ -331,7 +331,6 @@ export const SchemaVisualizer = ({
 
       {!hintDismissed && nodes.length > 0 && (
         <div className="link-hint" role="note">
-          <span className="link-hint-icon">🔗</span>
           <span>
             <strong>Tip:</strong> drag from the dot on the edge of one table to the dot on another to link them
             with a foreign key — or use the <strong>Link Tables</strong> button.

@@ -6,7 +6,6 @@
 export const SHOWCASE = [
   {
     id: 'select-from-where',
-    icon: '🔎',
     title: 'SELECT · FROM · WHERE',
     tagline: 'Projection, filtering and joins',
     description:
@@ -39,7 +38,6 @@ ORDER BY s.first_name, c.course_code`,
   },
   {
     id: 'nested-from',
-    icon: '🧩',
     title: 'Nested SELECT in FROM',
     tagline: 'Derived tables (subqueries in the FROM clause)',
     description:
@@ -77,7 +75,6 @@ WHERE d.avg_credits >= 3.5`,
   },
   {
     id: 'aggregation',
-    icon: '📊',
     title: 'Aggregation',
     tagline: 'GROUP BY · HAVING · MAX / MIN / COUNT / AVG',
     description:
@@ -114,7 +111,6 @@ HAVING COUNT(*) >= 2`,
   },
   {
     id: 'recursive',
-    icon: '🔁',
     title: 'Recursive query',
     tagline: 'WITH RECURSIVE',
     description:
@@ -154,7 +150,6 @@ FROM counter`,
   },
   {
     id: 'window',
-    icon: '🪟',
     title: 'Window functions',
     tagline: 'OVER · ORDER BY · PARTITION BY · LIMIT',
     description:

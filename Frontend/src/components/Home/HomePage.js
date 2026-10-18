@@ -131,7 +131,6 @@ export function HomePage({ onOpenInAnalyzer, onOpenInRunner }) {
               onClick={() => goTo(cat.id)}
               style={{ textAlign: 'left', padding: '14px 14px 12px', background: '#fff', border: '1px solid var(--border)', borderRadius: 10, cursor: 'pointer' }}
             >
-              <div style={{ fontSize: 22 }}>{cat.icon}</div>
               <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4, color: 'var(--text)' }}>{cat.title}</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{cat.tagline}</div>
             </button>
@@ -141,7 +140,7 @@ export function HomePage({ onOpenInAnalyzer, onOpenInRunner }) {
         {/* run-all bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, marginBottom: 28 }}>
           <button style={smallBtn(runningAll ? '#94a3b8' : '#16a34a')} onClick={runAll} disabled={runningAll}>
-            {runningAll ? 'Running…' : '▶ Run all examples'}
+            {runningAll ? 'Running…' : 'Run all examples'}
           </button>
           <span style={{ fontSize: 13, color: 'var(--text-mid)' }}>
             {passed + failed === 0 ? `${ALL_EXAMPLES.length} examples across ${SHOWCASE.length} feature groups.` : (
@@ -157,7 +156,7 @@ export function HomePage({ onOpenInAnalyzer, onOpenInRunner }) {
         {/* one section per feature — reads like a document */}
         {SHOWCASE.map((cat, ci) => (
           <section key={cat.id} id={`showcase-${cat.id}`} style={{ marginBottom: 36, scrollMarginTop: 12 }}>
-            <h2 style={{ margin: '0 0 4px', fontSize: 20 }}>{ci + 1}. {cat.icon} {cat.title}</h2>
+            <h2 style={{ margin: '0 0 4px', fontSize: 20 }}>{ci + 1}. {cat.title}</h2>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>{cat.tagline}</div>
             <p style={{ margin: '0 0 14px', fontSize: 14, color: 'var(--text-mid)', lineHeight: 1.6 }}>{cat.description}</p>
 
@@ -201,10 +200,10 @@ export function HomePage({ onOpenInAnalyzer, onOpenInRunner }) {
 
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 0' }}>
                     <button style={smallBtn('#2563eb')} onClick={() => run(ex)} disabled={r && r.status === 'running'}>
-                      {r && r.status === 'running' ? 'Running…' : '▶ Run here'}
+                      {r && r.status === 'running' ? 'Running…' : 'Run here'}
                     </button>
-                    <button style={smallBtn('#7c3aed')} onClick={() => onOpenInAnalyzer(ex.sql)}>🌳 Open in Query Tree</button>
-                    <button style={smallBtn('#fff', '#334155', '1px solid #cbd5e1')} onClick={() => onOpenInRunner(ex.sql)}>✎ Open in Runner</button>
+                    <button style={smallBtn('#7c3aed')} onClick={() => onOpenInAnalyzer(ex.sql)}>Open in Query Tree</button>
+                    <button style={smallBtn('#fff', '#334155', '1px solid #cbd5e1')} onClick={() => onOpenInRunner(ex.sql)}>Open in Runner</button>
                   </div>
 
                   {r && r.status === 'error' && (

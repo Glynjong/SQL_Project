@@ -69,7 +69,7 @@ export const StagePanel = ({ stage, onClose, onNodeClick }) => {
       {/* Data */}
       <div className="stage-panel-data">
         {stage.loading && <div className="stage-panel-loading">Fetching data…</div>}
-        {stage.error && <div className="stage-panel-error">⚠️ {stage.error}</div>}
+        {stage.error && <div className="stage-panel-error">{stage.error}</div>}
         {!stage.loading && !stage.error && <ResultsTable rows={stage.rows} />}
       </div>
     </div>

@@ -51,7 +51,7 @@ function AstNode({ data, selected }) {
     >
       <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
       <div style={{ fontSize: 10, fontWeight: 700, color: st.color, textTransform: 'uppercase', letterSpacing: 0.4 }}>
-        {st.icon} {st.name}
+        {st.name}
       </div>
       <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', ...clamp(2) }}>{data.title}</div>
       {data.summary && (
@@ -174,7 +174,7 @@ export function LogicalTree({
           return (
             <span key={key} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <span style={{ width: 10, height: 10, borderRadius: 3, background: st.bg, border: `1.5px solid ${st.color}`, display: 'inline-block' }} />
-              {st.icon} {st.name}
+              {st.name}
             </span>
           );
         })}
