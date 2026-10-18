@@ -28,6 +28,10 @@ export const deriveStageSQLs = (plan, originalQuery) => {
     sql = originalQuery.trimEnd().replace(/;$/, '');
   }
 
+  // Only scan nodes (and a Hash directly over a scan) get SQL for their own
+  // output; every other node falls back to the whole query.
+  plan._stageExact = ['Seq Scan', 'Index Scan', 'Index Only Scan'].includes(nodeType) ||
+    (nodeType === 'Hash' && Boolean(children[0] && children[0]['Relation Name']));
   plan._stageSQL = sql || originalQuery.trimEnd().replace(/;$/, '');
   children.forEach((child) => deriveStageSQLs(child, originalQuery));
 };
@@ -57,6 +61,7 @@ const flattenPlan = (plan, nodes, edges, parentId = null, depth = 0, x = 0) => {
       rows: plan['Plan Rows'],
       width: plan['Plan Width'],
       stageSQL: plan._stageSQL,
+      stageExact: plan._stageExact,
     },
   });
 

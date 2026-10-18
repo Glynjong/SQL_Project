@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import ReactFlow, { Background, Controls } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { buildPieSlices, arcPath, groupByTable } from '../../utils/shapley';
+import { MenuButton } from '../Common/MenuButton';
 
 function findToken(row) {
   // The backend appends this column when the query doesn't already ask
@@ -95,7 +96,7 @@ function PieChart({ data, loading }) {
         </div>
       </div>
       <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
-        usage-weighted Shapley approximation — every occurrence of a tuple in the circuit counts
+        equal-split estimate, not exact Shapley values — each gate shares its credit equally; repeated tuples count per use
       </div>
 
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block', margin: '12px auto' }}>
@@ -177,8 +178,7 @@ function PieChart({ data, loading }) {
 }
 
 function SetupPanel({ provStatus, statusLoading, onEnableProvenance, onRerun }) {
-  const [pendingTable, setPendingTable] = useState('');
-  const [enabling, setEnabling] = useState(false);
+  const [enabling, setEnabling] = useState(null); // name of the table being enabled
   const [enableError, setEnableError] = useState(null);
 
   if (provStatus.installed === false) {
@@ -213,34 +213,24 @@ function SetupPanel({ provStatus, statusLoading, onEnableProvenance, onRerun }) 
 
       {untracked.length > 0 && (
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <select
-            value={pendingTable}
-            onChange={(e) => setPendingTable(e.target.value)}
-            style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px' }}
-          >
-            <option value="">Select a table…</option>
-            {untracked.map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
-          <button
-            disabled={!pendingTable || enabling}
-            onClick={async () => {
-              setEnabling(true);
+          <MenuButton
+            label={enabling ? `Enabling ${enabling}…` : 'Enable Provenance ▾'}
+            items={untracked}
+            disabled={!!enabling}
+            title="Choose a table to start tracking provenance on"
+            style={{ padding: '7px 16px', fontSize: '12px' }}
+            onPick={async (table) => {
+              setEnabling(table);
               setEnableError(null);
-              const result = await onEnableProvenance(pendingTable);
-              setEnabling(false);
+              const result = await onEnableProvenance(table);
+              setEnabling(null);
               if (!result.success) {
                 setEnableError(result.error);
               } else {
-                setPendingTable('');
                 onRerun();
               }
             }}
-            style={{ padding: '6px 14px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: pendingTable ? 'pointer' : 'not-allowed', opacity: pendingTable ? 1 : 0.6 }}
-          >
-            {enabling ? 'Enabling…' : 'Enable Provenance'}
-          </button>
+          />
           {statusLoading && <span style={{ fontSize: '11px', color: '#64748b' }}>refreshing…</span>}
         </div>
       )}

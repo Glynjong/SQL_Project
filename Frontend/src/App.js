@@ -98,6 +98,7 @@ function App() {
       rows: estimatedRows,
       width,
       stageSQL,
+      stageExact,
     } = node.data;
 
     queryTree.setStagePanel({
@@ -110,6 +111,7 @@ function App() {
       estimatedRows,
       width,
       stageSQL,
+      stageExact,
       loading: true,
       error: null,
       rows: null,

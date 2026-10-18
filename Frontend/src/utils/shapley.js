@@ -9,12 +9,14 @@ function rowSummary(row) {
   return trunc(vals.slice(0, 3).map(String).join(', '), 42);
 }
 
-// Usage-weighted, approximate Shapley attribution over TUPLE OCCURRENCES.
+// Equal-split responsibility HEURISTIC over TUPLE OCCURRENCES (not the Shapley value).
 //
 // Starting at the result gate with a total share of 1, every gate splits its
-// share equally between its children (the closed form for read-once AND/OR
-// formulas — Livshits, Bertossi, Kimelfeld), and each INPUT leaf collects what
-// reaches it. Crucially, shares are keyed by TUPLE, not by table, and a tuple
+// share equally between its children, and each INPUT leaf collects what
+// reaches it. This matches the Shapley value only for a single AND or a single
+// OR of distinct tuples; once gates are nested it differs (for (a AND b) OR c the
+// Shapley values are 1/6, 1/6, 2/3, but equal splitting gives 1/4, 1/4, 1/2).
+// See report Section 5.5 for a comparison with ProvSQL's exact shapley(). Crucially, shares are keyed by TUPLE, not by table, and a tuple
 // that feeds the result through several paths (e.g. a self-join, or a shared
 // sub-expression) is counted once per occurrence — so it carries a
 // proportionally larger share. That is a usage-weighted variant: an exact

@@ -75,7 +75,8 @@ export const QueryTree = ({
     if (nextTab === 'logical' && !astLoading && (astNodes.length === 0 || (astControls && astControls.lastParsedSql !== query))) {
       onParseAST(query);
     } else if (nextTab === 'provsql') {
-      if (provStatus.installed === null && !statusLoading) {
+      // Refresh on every visit: tables may have been created/imported since.
+      if (!statusLoading) {
         onFetchProvStatus();
       }
       if (provRows.length === 0 && !provLoading) {

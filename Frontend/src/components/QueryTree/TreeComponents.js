@@ -32,7 +32,8 @@ export const TreeToolbar = ({ query, onQueryChange, onAnalyze, isLoading }) => {
     const mutates = /^\s*(insert|update|delete|drop|truncate|alter)\b/i.test(query || '');
     if (mutates && !window.confirm(
       'This looks like it modifies data (INSERT/UPDATE/DELETE/DROP/TRUNCATE/ALTER). ' +
-      'Explain actually executes the query for real (EXPLAIN ANALYZE), including its side effects. Continue?'
+      'Explain runs the statement with EXPLAIN ANALYZE to measure it, then rolls the transaction back, ' +
+      'so the data is not changed (ID sequences may still advance). Continue?'
     )) {
       return;
     }

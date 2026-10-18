@@ -7,6 +7,9 @@ export const StagePanel = ({ stage, onClose, onNodeClick }) => {
   if (!stage) return null;
 
   const color = costColor(stage.totalCost);
+  // Joins, aggregates, sorts etc. have no SQL of their own, so their preview is
+  // the result of the WHOLE query. Say so, so it is not read as this operator's output.
+  const exact = stage.stageExact !== false;
 
   return (
     <div className="stage-panel">
@@ -43,7 +46,7 @@ export const StagePanel = ({ stage, onClose, onNodeClick }) => {
 
       {/* SQL at this stage */}
       <div className="stage-panel-section">
-        <div className="stage-panel-label">SQL at this stage</div>
+        <div className="stage-panel-label">{exact ? 'SQL at this stage' : 'Query used for the preview'}</div>
         <pre className="stage-panel-sql">{stage.stageSQL}</pre>
       </div>
 
@@ -57,13 +60,24 @@ export const StagePanel = ({ stage, onClose, onNodeClick }) => {
         </div>
       )}
 
+      {!exact && (
+        <div className="stage-panel-section">
+          <div className="stage-panel-condition" style={{ background: '#fff7ed', color: '#9a3412' }}>
+            The output of this {stage.nodeType} operator cannot be shown on its own. The preview below is the
+            result of the whole query, not the rows produced by this operator.
+          </div>
+        </div>
+      )}
+
       {/* Data preview label */}
       <div className="stage-panel-data-label">
         {stage.loading
           ? 'Loading data…'
           : stage.error
           ? 'Error'
-          : 'Data preview (up to 50 rows)'}
+          : exact
+          ? 'Data preview (up to 50 rows)'
+          : 'Result of the whole query (up to 50 rows)'}
       </div>
 
       {/* Data */}

@@ -1,55 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import ReactFlow, { Background, Controls, ConnectionMode } from 'reactflow';
 import 'reactflow/dist/style.css';
 import '../../App.css';
 import { COLUMN_TYPES } from '../../utils/schemaUtils';
 import { EditTableModal } from './EditTableModal';
 import { LinkTablesModal } from './LinkTablesModal';
-
-// "Edit table" as a normal toolbar button that opens a menu of tables — a
-// native <select> can't be styled to match the other buttons.
-const EditTableMenu = ({ tables, onEditTable }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('mousedown', close);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-
-  return (
-    <div className="toolbar-menu" ref={ref}>
-      <button
-        className="btn-primary"
-        onClick={() => setOpen((o) => !o)}
-        disabled={tables.length === 0}
-        title={tables.length === 0 ? 'No tables loaded yet' : "Edit a table's structure or rows"}
-      >
-        Edit Table ▾
-      </button>
-      {open && (
-        <div className="toolbar-menu-list">
-          {tables.map((t) => (
-            <button
-              key={t}
-              className="toolbar-menu-item"
-              onClick={() => { setOpen(false); onEditTable(t); }}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
+import { MenuButton } from '../Common/MenuButton';
 
 export const VisualizerToolbar = ({ onClearCanvas, onLoadAllTables, onOpenAddTable, tables = [], onEditTable, onOpenLink }) => (
   <div className="visualizer-toolbar">
@@ -61,7 +17,12 @@ export const VisualizerToolbar = ({ onClearCanvas, onLoadAllTables, onOpenAddTab
       <span className="visualizer-legend-hint">Drag one table's handle onto another to link them</span>
     </div>
     <div className="toolbar-buttons">
-      <EditTableMenu tables={tables} onEditTable={onEditTable} />
+      <MenuButton
+        label="Edit Table ▾"
+        items={tables}
+        onPick={onEditTable}
+        title={tables.length === 0 ? 'No tables loaded yet' : "Edit a table's structure or rows"}
+      />
       <button className="btn-primary" onClick={onOpenAddTable}>
         + Add Table
       </button>

@@ -35,155 +35,58 @@ const pool = new Pool({
 // it doesn't support (e.g. ORDER BY on an aggregate result). Only the
 // ProvSQL tab wants that. Every other feature (Query Runner, Explain, schema
 // editing) runs with the hook switched off for the duration of its query, so
-// ProvSQL's limitations can't leak into them. Note: with provsql.active = off
-// this project's ProvSQL 1.5.0 build still rejected WITH RECURSIVE ("Recursive
-// CTEs not supported"), so recursive queries additionally get the temp-table
-// treatment in queryShadowed() below. (ProvSQL 1.7+ supports recursion natively, but has
-// a planner-hook crash with the switch off, fixed in 1.8.0 — if you upgrade to
-// 1.7.x, set PROVSQL_KEEP_ON_FOR_RECURSIVE=1 to leave the hook on for them.)
-const keepProvSQLOn = (sql) =>
-  process.env.PROVSQL_KEEP_ON_FOR_RECURSIVE === '1' && /\bWITH\s+RECURSIVE\b/i.test(sql);
+// ProvSQL's limitations can't leak into them. With ProvSQL 1.8.0 (pinned in
+// /Postgres/Dockerfile) that switch also covers WITH RECURSIVE queries.
+//
+// mode 'commit'   – normal autocommit; changes are kept (Query Runner, schema editing)
+// mode 'rollback' – in a transaction that is always rolled back (EXPLAIN ANALYZE:
+//                   the plan and timings are kept, every change is undone — NFR3.
+//                   Sequences still advance, because nextval() is never rolled back.)
+// mode 'readonly' – same, and the transaction is READ ONLY (plain-results fallback)
+async function queryWithoutProvSQL(sql, mode = 'commit') {
+  const client = await pool.connect();
+  let broken = false;
+  try {
+    if (mode === 'commit') {
+      await client.query('SET provsql.active = off');
+    } else {
+      await client.query(mode === 'readonly' ? 'BEGIN READ ONLY' : 'BEGIN');
+      await client.query('SET LOCAL provsql.active = off');
+    }
+    return await client.query(sql);
+  } finally {
+    // pooled connections are reused, so never leave the setting or a transaction behind
+    try {
+      await client.query(mode === 'commit' ? 'RESET provsql.active' : 'ROLLBACK');
+    } catch (e) {
+      broken = true;
+    }
+    client.release(broken);
+  }
+}
 
-// ── Recursive queries over provenance-tracked tables ──────────────────────
-// ProvSQL 1.5.0 rejects WITH RECURSIVE ("Recursive CTEs not supported") when
-// the query reads a provenance-tracked table, and in practice (observed on this
-// project's build) the provsql.active switch did not get it to skip that check. What does work is
-// not triggering ProvSQL at all: its planner hook only fires for queries that
-// touch a table with a `provsql` column. So, for a read-only recursive query,
-// we copy the tracked tables the query mentions into TEMP tables WITHOUT that
-// column (same names, so they shadow the real ones), run the query against
-// the copies, and always ROLLBACK — the real tables are never modified.
-const MAX_SHADOW_ROWS = 200000; // reltuples estimate; larger tables are not copied
-const isRecursiveSql = (sql) => /\bWITH\s+RECURSIVE\b/i.test(sql);
-const quoteIdent = (s) => `"${String(s).replace(/"/g, '""')}"`;
-const mentionsName = (sql, name) =>
-  new RegExp(`(^|[^A-Za-z0-9_$])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^A-Za-z0-9_$]|$)`, 'i').test(sql);
+// Several statements in one request come back as an array of results — use the last one, like psql does.
+const lastResult = (r) => (Array.isArray(r) ? r[r.length - 1] : r);
 
+// Base tables in public that have provenance tracking (ProvSQL's hidden provsql column).
 const TRACKED_TABLES_SQL = `
-  SELECT n.nspname, c.relname, c.reltuples::bigint AS est_rows,
-         (SELECT array_agg(a2.attname::text ORDER BY a2.attnum)
-            FROM pg_attribute a2
-           WHERE a2.attrelid = c.oid AND a2.attnum > 0 AND NOT a2.attisdropped
-             AND a2.attname <> 'provsql') AS cols
-    FROM pg_attribute a
-    JOIN pg_class c ON c.oid = a.attrelid
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-   WHERE a.attname = 'provsql' AND NOT a.attisdropped AND a.atttypid = 'uuid'::regtype
-     AND c.relkind IN ('r', 'p')
-     AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'provsql')
-     AND n.nspname !~ '^pg_'
-   ORDER BY n.nspname, c.relname`;
+  SELECT c.relname AS table_name
+  FROM pg_attribute a
+  JOIN pg_class c ON c.oid = a.attrelid
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE a.attname = 'provsql' AND n.nspname = 'public' AND c.relkind = 'r'
+  ORDER BY c.relname`;
 
-// True only for plain SELECTs (or EXPLAIN of a SELECT) — never anything that writes.
-function onlyReadsData(parsed) {
-  let list = parsed;
-  if (list && !Array.isArray(list) && Array.isArray(list.stmts)) list = list.stmts;
-  if (!Array.isArray(list) || list.length === 0) return false;
-  return list.every((item) => {
-    let s = item;
-    if (s && s.RawStmt) s = s.RawStmt;
-    if (s && s.stmt) s = s.stmt;
-    if (!s || typeof s !== 'object') return false;
-    const tag = Object.keys(s)[0];
-    if (tag === 'SelectStmt') return true;
-    if (tag === 'ExplainStmt') {
-      const q = s.ExplainStmt && s.ExplainStmt.query;
-      return !!q && Object.keys(q)[0] === 'SelectStmt';
-    }
-    return false;
-  });
-}
-
-// Returns the query result, or null when this approach doesn't apply (not a
-// recursive read-only query, or it mentions no provenance-tracked table) so
-// the caller carries on with the normal path.
-async function queryShadowed(sql) {
-  if (!isRecursiveSql(sql) || keepProvSQLOn(sql)) return null;
-  let parsed = null;
-  try {
-    if (pgsqlParser && pgsqlParser.parse) parsed = await pgsqlParser.parse(sql);
-  } catch (e) {
-    return null; // invalid SQL — let the normal path report Postgres's own error
-  }
-  if (!onlyReadsData(parsed)) return null;
-
-  const client = await pool.connect();
-  let broken = false;
-  try {
-    await client.query('BEGIN');
-    const tracked = (await client.query(TRACKED_TABLES_SQL)).rows
-      .filter((t) => mentionsName(sql, t.relname) && t.cols && t.cols.length && Number(t.est_rows) <= MAX_SHADOW_ROWS);
-    if (tracked.length === 0) return null;
-
-    // belt and braces: also switch the hook off while copying, so the copy
-    // can't pick up a provenance column
-    const guc = await client.query("SELECT current_setting('provsql.active', true) AS v");
-    if (guc.rows[0].v !== null) await client.query('SET LOCAL provsql.active = off');
-
-    const done = new Set();
-    for (const t of tracked) {
-      if (done.has(t.relname)) continue; // same name in two schemas: first one wins, like search_path
-      done.add(t.relname);
-      // eslint-disable-next-line no-await-in-loop
-      await client.query(
-        `CREATE TEMP TABLE ${quoteIdent(t.relname)} ON COMMIT DROP AS SELECT ${t.cols.map(quoteIdent).join(', ')} FROM ${quoteIdent(t.nspname)}.${quoteIdent(t.relname)}`
-      );
-      // eslint-disable-next-line no-await-in-loop
-      await client.query(`ALTER TABLE pg_temp.${quoteIdent(t.relname)} DROP COLUMN IF EXISTS provsql`);
-    }
-    await client.query("SELECT set_config('search_path', 'pg_temp, ' || current_setting('search_path'), true)");
-    await client.query('SET TRANSACTION READ ONLY'); // writing to temp tables is still allowed, nothing else is
-    return await client.query(sql);
-  } finally {
-    try { await client.query('ROLLBACK'); } catch (e) { broken = true; }
-    client.release(broken);
-  }
-}
-
-async function queryIsolated(sql) {
-  const shadowed = await queryShadowed(sql);
-  if (shadowed) return shadowed;
-  const client = await pool.connect();
-  let resetFailed = false;
-  try {
-    if (!keepProvSQLOn(sql)) {
-      try {
-        await client.query('SET provsql.active = off');
-      } catch (e) {
-        /* ProvSQL not available on this connection — nothing to switch off */
-      }
-    }
-    return await client.query(sql);
-  } finally {
-    // pooled connections are reused, so never leave the setting behind
-    try { await client.query('RESET provsql.active'); } catch (e) { resetFailed = true; }
-    client.release(resetFailed);
-  }
-}
-
-// Same, but inside a read-only transaction that is always rolled back. Used
-// for the "show plain results" fallback so it can never modify data.
-async function queryReadOnlyIsolated(sql) {
-  const client = await pool.connect();
-  let broken = false;
-  try {
-    await client.query('BEGIN READ ONLY');
-    if (!keepProvSQLOn(sql)) await client.query('SET LOCAL provsql.active = off');
-    return await client.query(sql);
-  } finally {
-    try { await client.query('ROLLBACK'); } catch (e) { broken = true; }
-    client.release(broken);
-  }
+async function provSQLInstalled() {
+  const r = await pool.query("SELECT 1 FROM pg_extension WHERE extname = 'provsql'");
+  return r.rowCount > 0;
 }
 
 app.post('/run-query', async (req, res) => {
   const { sql } = req.body;
   console.log('Executing query:', sql);
   try {
-    // Several statements in one request come back as an array of results
-    // (all already committed) — report the last one, like psql does.
-    const raw = await queryIsolated(sql);
-    const result = Array.isArray(raw) ? raw[raw.length - 1] : raw;
+    const result = lastResult(await queryWithoutProvSQL(sql));
     console.log('Query result:', { rows: result.rows.length, command: result.command, rowCount: result.rowCount });
     
     // Check if this was a SELECT (has rows) or a CREATE/INSERT (has rowCount/command)
@@ -202,7 +105,7 @@ app.post('/run-query', async (req, res) => {
 app.post('/explain-query', async (req, res) => {
   const { sql } = req.body;
   try {
-    const result = await queryIsolated(`EXPLAIN (FORMAT JSON) ${sql}`);
+    const result = await queryWithoutProvSQL(`EXPLAIN (FORMAT JSON) ${sql}`);
     res.json({ success: true, plan: result.rows[0]['QUERY PLAN'][0] });
   } catch (err) {
     console.error(err);
@@ -213,7 +116,7 @@ app.post('/explain-query', async (req, res) => {
 app.post('/explain-analyze-query', async (req, res) => {
   const { sql } = req.body;
   try {
-    const result = await queryIsolated(`EXPLAIN (ANALYZE, BUFFERS, TIMING, VERBOSE, FORMAT JSON) ${sql}`);
+    const result = await queryWithoutProvSQL(`EXPLAIN (ANALYZE, BUFFERS, TIMING, VERBOSE, FORMAT JSON) ${sql}`, 'rollback');
     res.json({ success: true, plan: result.rows[0]['QUERY PLAN'][0] });
   } catch (err) {
     console.error(err);
@@ -243,8 +146,7 @@ app.post('/parse-query', async (req, res) => {
 // ProvSQL requires CREATE EXTENSION provsql CASCADE (see /Postgres/init-provsql.sql
 // for the Docker image that provisions this automatically).
 async function requireProvSQL(res) {
-  const extCheck = await pool.query("SELECT 1 FROM pg_extension WHERE extname = 'provsql'");
-  if (extCheck.rowCount === 0) {
+  if (!(await provSQLInstalled())) {
     res.status(400).json({
       success: false,
       error: "ProvSQL extension is not installed or enabled in this PostgreSQL database. " +
@@ -264,8 +166,7 @@ async function requireProvSQL(res) {
 // have provenance tracking enabled (i.e. have a hidden provsql column).
 app.get('/provsql/status', async (req, res) => {
   try {
-    const extCheck = await pool.query("SELECT 1 FROM pg_extension WHERE extname = 'provsql'");
-    const installed = extCheck.rowCount > 0;
+    const installed = await provSQLInstalled();
 
     let enabledTables = [];
     let allTables = [];
@@ -274,16 +175,7 @@ app.get('/provsql/status', async (req, res) => {
         "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name"
       );
       allTables = tablesResult.rows.map((r) => r.table_name);
-
-      const provTablesResult = await pool.query(`
-        SELECT c.relname AS table_name
-        FROM pg_attribute a
-        JOIN pg_class c ON c.oid = a.attrelid
-        JOIN pg_namespace n ON n.oid = c.relnamespace
-        WHERE a.attname = 'provsql' AND n.nspname = 'public' AND c.relkind = 'r'
-        ORDER BY c.relname
-      `);
-      enabledTables = provTablesResult.rows.map((r) => r.table_name);
+      enabledTables = (await pool.query(TRACKED_TABLES_SQL)).rows.map((r) => r.table_name);
     }
 
     res.json({ success: true, installed, allTables, enabledTables });
@@ -307,14 +199,7 @@ app.post('/provsql/lookup-token', async (req, res) => {
   try {
     if (!(await requireProvSQL(res))) return;
 
-    const provTablesResult = await pool.query(`
-      SELECT c.relname AS table_name
-      FROM pg_attribute a
-      JOIN pg_class c ON c.oid = a.attrelid
-      JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE a.attname = 'provsql' AND n.nspname = 'public' AND c.relkind = 'r'
-      ORDER BY c.relname
-    `);
+    const provTablesResult = await pool.query(TRACKED_TABLES_SQL);
 
     for (const { table_name: table } of provTablesResult.rows) {
       // eslint-disable-next-line no-await-in-loop
@@ -412,8 +297,7 @@ app.post('/provsql/provenance', async (req, res) => {
     // 3. Any other ProvSQL conflict: still show the data, without provenance.
     //    Read-only + rolled back, so this can never change anything.
     try {
-      const plainRaw = (await queryShadowed(trimmed)) || (await queryReadOnlyIsolated(trimmed));
-      const plain = Array.isArray(plainRaw) ? plainRaw[plainRaw.length - 1] : plainRaw;
+      const plain = lastResult(await queryWithoutProvSQL(trimmed, 'readonly'));
       // ProvSQL handles recursion with set semantics (UNION) but not bag semantics (UNION ALL).
       const tip = /recursi/i.test(firstError.message) && /\bUNION\s+ALL\b/i.test(trimmed)
         ? ' Tip: to get provenance for this recursive query, try changing UNION ALL to UNION.'
@@ -444,7 +328,7 @@ app.post('/provsql/provenance', async (req, res) => {
 // ProvSQL Circuit Export Endpoint
 // Walks the provenance circuit rooted at a token using ProvSQL's
 // circuit_subgraph() introspection function. Verified against a live
-// v1.5.0 install — its real signature is:
+// install (v1.5.0, unchanged in v1.8.0) — its real signature is:
 //   circuit_subgraph(root uuid, max_depth integer DEFAULT 8)
 //     RETURNS TABLE(node uuid, parent uuid, child_pos integer,
 //                   gate_type text, info1 text, info2 text, depth integer)
@@ -502,5 +386,5 @@ app.post('/provsql/circuit', async (req, res) => {
 app.listen(5000, () => {
   console.log('Server running on port 5000');
   // If you can't see this line in `docker compose logs backend`, the backend is running old code.
-  console.log('ProvSQL isolation: ON — recursive queries use plain temp copies of tracked tables (build 2026-10-06b)');
+  console.log('ProvSQL isolation: ON (build 2026-10-18b, temp-table workaround removed)');
 });

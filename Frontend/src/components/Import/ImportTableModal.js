@@ -18,7 +18,9 @@ const inputStyle = {
   width: '100%', boxSizing: 'border-box', padding: '4px 6px', border: '1px solid #cbd5e1',
   borderRadius: 4, fontSize: 12, fontFamily: 'inherit', background: '#ffffff',
 };
-const th = { padding: '6px 8px', textAlign: 'left', background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', whiteSpace: 'nowrap', verticalAlign: 'top' };
+const th = { padding: '6px 8px', textAlign: 'left', background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', verticalAlign: 'top', minWidth: 160 };
+// name box above type picker, each on its own line (inline controls would sit side by side and spill into the next column)
+const headerField = { ...inputStyle, display: 'block' };
 const td = { padding: '4px 8px', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' };
 
 async function exec(sql) {
@@ -153,7 +155,7 @@ export function ImportTableModal({ open, existingTables, onClose, onImported }) 
             <span style={{ fontSize: 12, color: fileName ? '#334155' : '#94a3b8', fontFamily: "'IBM Plex Mono', monospace", maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={fileName}>
               {fileName || 'No file chosen'}
             </span>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-mid)', cursor: busy ? 'not-allowed' : 'pointer' }}>
               <input type="checkbox" checked={hasHeader} onChange={(e) => toggleHeader(e.target.checked)} disabled={busy} />
               First row is a header
             </label>
@@ -186,8 +188,8 @@ export function ImportTableModal({ open, existingTables, onClose, onImported }) 
                     <tr>
                       {columns.map((c, i) => (
                         <th key={i} style={th}>
-                          <input style={{ ...inputStyle, marginBottom: 4, fontWeight: 600 }} value={c.name} disabled={busy} onChange={(e) => setCol(i, { name: e.target.value })} />
-                          <select style={inputStyle} value={c.type} disabled={busy} onChange={(e) => setCol(i, { type: e.target.value })}>
+                          <input style={{ ...headerField, marginBottom: 4, fontWeight: 600 }} value={c.name} disabled={busy} onChange={(e) => setCol(i, { name: e.target.value })} />
+                          <select style={headerField} value={c.type} disabled={busy} onChange={(e) => setCol(i, { type: e.target.value })}>
                             {IMPORT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                           </select>
                         </th>
