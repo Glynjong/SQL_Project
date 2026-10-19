@@ -14,7 +14,7 @@ docker-compose up --build
 This will start:
 - **PostgreSQL** - Database on `localhost:5433` (external tools only — see note below)
 - **Backend** - Express server on `localhost:5000`
-- **Frontend** - React app on `localhost:80` (http://localhost)
+- **Frontend** - React app on `localhost:3000` (http://localhost:3000)
 - **pgAdmin4** - Database manager on `localhost:5050` (http://localhost:5050)
 
 ### Stop Services

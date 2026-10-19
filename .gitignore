@@ -1,0 +1,11 @@
+# Local environment (copy .env.example to .env)
+.env
+
+# Dependencies and build output
+node_modules/
+build/
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.vscode/
