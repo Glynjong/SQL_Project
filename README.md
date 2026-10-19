@@ -1,6 +1,6 @@
 # SQL Visual Debugger
 
-A web-based tool for understanding how SQL queries execute. You write a query against a PostgreSQL database and the tool shows its physical execution plan, its logical (relational algebra) tree, and row-level provenance computed with the [ProvSQL](https://github.com/PierreSenellart/provsql) extension, so you can trace which input rows produced each result.
+A web-based tool for understanding how SQL queries execute. You write a query against a PostgreSQL database and the tool shows its physical execution plan, its logical tree (PostgreSQL's parse tree), and row-level provenance computed with the [ProvSQL](https://github.com/PierreSenellart/provsql) extension, so you can trace which input rows produced each result.
 
 The stack is a React frontend, a Node.js/Express backend, PostgreSQL 15 with ProvSQL, and pgAdmin. All four run in Docker.
 
